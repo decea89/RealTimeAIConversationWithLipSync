@@ -22,10 +22,12 @@ namespace MVP.Conversation
         public double llmResponseTime;
         public double ttsReadyTime;
         public double playbackStartTime;
+        public double playbackEndTime;
         public double turnCompleteTime;
 
         public void StartTotal() => requestStartTime = Time.realtimeSinceStartupAsDouble;
         public void MarkPlaybackStart() => playbackStartTime = Time.realtimeSinceStartupAsDouble;
+        public void MarkPlaybackEnd() => playbackEndTime = Time.realtimeSinceStartupAsDouble;
         public void StopTotal() => turnCompleteTime = Time.realtimeSinceStartupAsDouble;
 
         public void StartStt() => sttStartTime = Time.realtimeSinceStartupAsDouble;
@@ -41,6 +43,8 @@ namespace MVP.Conversation
         public double ChatSeconds => llmResponseTime > chatStartTime ? llmResponseTime - chatStartTime : 0.0;
         public double TtsSeconds => ttsReadyTime > ttsStartTime ? ttsReadyTime - ttsStartTime : 0.0;
         public double TimeToFirstAudioSeconds => playbackStartTime > requestStartTime ? playbackStartTime - requestStartTime : 0.0;
+        public double PlaybackDurationSeconds => playbackEndTime > playbackStartTime ? playbackEndTime - playbackStartTime : 0.0;
+        public double TimeToPlaybackEndSeconds => playbackEndTime > requestStartTime ? playbackEndTime - requestStartTime : 0.0;
         public double TurnCompleteSeconds => turnCompleteTime > requestStartTime ? turnCompleteTime - requestStartTime : 0.0;
     }
 
