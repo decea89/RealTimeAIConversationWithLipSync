@@ -11,14 +11,34 @@ namespace MVP.Conversation
 
         private int readPos;
         private int writePos;
-        private int available;
+        private int availableSamples;
+        private long totalSamplesWritten;
+        private long totalSamplesRead;
 
         public int AvailableSamples
         {
             get
             {
                 lock (locker)
-                    return available;
+                    return availableSamples;
+            }
+        }
+
+        public long TotalSamplesWritten
+        {
+            get
+            {
+                lock (locker)
+                    return totalSamplesWritten;
+            }
+        }
+
+        public long TotalSamplesRead
+        {
+            get
+            {
+                lock (locker)
+                    return totalSamplesRead;
             }
         }
 
@@ -34,53 +54,58 @@ namespace MVP.Conversation
             {
                 readPos = 0;
                 writePos = 0;
-                available = 0;
+                availableSamples = 0;
+                totalSamplesWritten = 0;
+                totalSamplesRead = 0;
                 Array.Clear(buffer, 0, buffer.Length);
             }
         }
 
-        public void Write(float[] samples, int count)
+        public void Write(float[] samples, int sampleCount)
         {
-            if (samples == null || count <= 0)
+            if (samples == null || sampleCount <= 0)
                 return;
 
             lock (locker)
             {
-                for (int i = 0; i < count; i++)
+                for (int i = 0; i < sampleCount; i++)
                 {
                     buffer[writePos] = samples[i];
                     writePos = (writePos + 1) % capacity;
 
-                    if (available < capacity)
+                    if (availableSamples < capacity)
                     {
-                        available++;
+                        availableSamples++;
                     }
                     else
                     {
                         readPos = (readPos + 1) % capacity;
                     }
+
+                    totalSamplesWritten++;
                 }
             }
         }
 
-        public void Read(float[] dst)
+        public void Read(float[] destination)
         {
-            if (dst == null)
+            if (destination == null)
                 return;
 
             lock (locker)
             {
-                for (int i = 0; i < dst.Length; i++)
+                for (int i = 0; i < destination.Length; i++)
                 {
-                    if (available > 0)
+                    if (availableSamples > 0)
                     {
-                        dst[i] = buffer[readPos];
+                        destination[i] = buffer[readPos];
                         readPos = (readPos + 1) % capacity;
-                        available--;
+                        availableSamples--;
+                        totalSamplesRead++;
                     }
                     else
                     {
-                        dst[i] = 0f;
+                        destination[i] = 0f;
                     }
                 }
             }

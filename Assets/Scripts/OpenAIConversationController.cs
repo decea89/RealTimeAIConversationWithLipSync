@@ -30,6 +30,9 @@ namespace MVP.Conversation
         [SerializeField] private TMP_InputField debugInputField;
         [SerializeField] private Button debugSendButton;
 
+        [SerializeField] private KeyCode playDebugCapturedClipKey = KeyCode.P;
+        [SerializeField] private StreamingOpenAITTSClient streamingDebugClient;
+
         private IChatService chatService;
         private ISTTService sttService;
         private ITTSService ttsService;
@@ -89,6 +92,11 @@ namespace MVP.Conversation
 
             if (Input.GetKeyUp(keyboardDebugKey))
                 EndPushToTalkAndSend();
+
+            if (Input.GetKeyDown(playDebugCapturedClipKey) && streamingDebugClient != null)
+            {
+                streamingDebugClient.PlayDebugCapturedClip(avatarAudioSource);
+            }
         }
 
         public void StartTextConversation(string userText)
@@ -337,7 +345,10 @@ namespace MVP.Conversation
                     {
                         streamingError = err;
                     },
-                    onCompleted: () => { });
+                    onCompleted: () =>
+                    {
+                        result.timing.MarkPlaybackEnd();
+                    });
 
                 if (!string.IsNullOrEmpty(streamingError))
                 {
@@ -351,6 +362,9 @@ namespace MVP.Conversation
                     result.timing.StopTts();
                     result.timing.MarkPlaybackStart();
                 }
+
+                if (result.timing.playbackEndTime <= 0.0)
+                    result.timing.MarkPlaybackEnd();
 
                 yield break;
             }
@@ -398,6 +412,8 @@ namespace MVP.Conversation
             result.timing.MarkPlaybackStart();
 
             yield return new WaitForSeconds(ttsClip.length);
+
+            result.timing.MarkPlaybackEnd();
         }
 
         private void LogTiming(ConversationResult result)
@@ -407,7 +423,10 @@ namespace MVP.Conversation
 
             string timingText =
                 $"STT: {result.timing.SttSeconds:F2}s | Chat: {result.timing.ChatSeconds:F2}s | TTS: {result.timing.TtsSeconds:F2}s\n" +
-                $"Time to first audio: {result.timing.TimeToFirstAudioSeconds:F2}s | Turn complete: {result.timing.TurnCompleteSeconds:F2}s";
+                $"Time to first audio: {result.timing.TimeToFirstAudioSeconds:F2}s | " +
+                $"Playback duration: {result.timing.PlaybackDurationSeconds:F2}s | " +
+                $"Time to playback end: {result.timing.TimeToPlaybackEndSeconds:F2}s | " +
+                $"Turn coroutine complete: {result.timing.TurnCompleteSeconds:F2}s";
 
             if (includeAssistantTextInTimingView && !string.IsNullOrWhiteSpace(result.assistantText))
                 timingText += $"\n\nAI: {result.assistantText}";
