@@ -537,6 +537,61 @@ MonoBehaviour:
   m_ShadowLayerMask: 1
   m_RenderingLayers: 1
   m_ShadowRenderingLayers: 1
+--- !u!1 &524866761
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 524866763}
+  - component: {fileID: 524866762}
+  m_Layer: 0
+  m_Name: StreamingTTS
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!114 &524866762
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 524866761}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: c2e88891ee7c9bb499cdc9030df01f09, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::MVP.Conversation.StreamingOpenAITTSClient
+  apiKey: YOUR_OPENAI_API_KEY
+  endpoint: https://api.openai.com/v1/audio/speech
+  model: gpt-4o-mini-tts
+  voice: coral
+  instructions: Speak in warm, natural Spanish, with clear diction and a conversational
+    tone suitable for a historical character in VR.
+  sampleRate: 24000
+  channels: 1
+  maxClipSeconds: 45
+  prebufferSeconds: 0.4
+  logChunkProgress: 0
+--- !u!4 &524866763
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 524866761}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 1136413632}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &532476717
 GameObject:
   m_ObjectHideFlags: 0
@@ -733,6 +788,57 @@ Transform:
   - {fileID: 395058537}
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!1 &725724492
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 725724493}
+  - component: {fileID: 725724494}
+  m_Layer: 0
+  m_Name: BackendChatClient
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &725724493
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 725724492}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 1136413632}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &725724494
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 725724492}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 679f20c5578be0847bc909e3aec34a67, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::MVP.Conversation.CharacterBackendChatClient
+  baseUrl: https://your-backend.example.com
+  chatPath: /chat
+  bearerToken: YOUR_BACKEND_TOKEN
+  characterId: default_character
+  locale: es-ES
+  logRequests: 0
+  logResponses: 0
 --- !u!1 &817902945
 GameObject:
   m_ObjectHideFlags: 0
@@ -1234,7 +1340,9 @@ Transform:
   m_LocalPosition: {x: 0, y: 0, z: 0}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
-  m_Children: []
+  m_Children:
+  - {fileID: 725724493}
+  - {fileID: 524866763}
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!114 &1136413633
@@ -1244,7 +1352,7 @@ MonoBehaviour:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1136413628}
-  m_Enabled: 1
+  m_Enabled: 0
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 3aa39b8dfccd2ee4a917ceee19d7a4b6, type: 3}
   m_Name: 
@@ -1264,7 +1372,7 @@ MonoBehaviour:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1136413628}
-  m_Enabled: 1
+  m_Enabled: 0
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: caf5104f5cc386d40abcba9b2bebc7bf, type: 3}
   m_Name: 
@@ -1324,9 +1432,9 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: b5e8cbf6a9b4b4f448adf6e656e07e37, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::MVP.Conversation.OpenAIConversationController
-  chatServiceBehaviour: {fileID: 1136413634}
+  chatServiceBehaviour: {fileID: 725724494}
   sttServiceBehaviour: {fileID: 1136413637}
-  ttsServiceBehaviour: {fileID: 1136413633}
+  ttsServiceBehaviour: {fileID: 524866762}
   microphoneRecorder: {fileID: 1136413635}
   avatarAudioSource: {fileID: 1956074376}
   debugView: {fileID: 2075737445}

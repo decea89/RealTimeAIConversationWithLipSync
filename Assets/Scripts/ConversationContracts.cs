@@ -19,4 +19,15 @@ namespace MVP.Conversation
         IEnumerator RequestChat(string userMessage, Action<string, string> onComplete);
         IEnumerator RequestChatRich(string userMessage, Action<ChatServiceResult, string> onComplete);
     }
+
+    public interface IStreamingTTSService
+    {
+        IEnumerator RequestSpeechStreamed(
+            string text,
+            AudioSource targetAudioSource,
+            Action onPlaybackStarted,
+            Action<string> onError,
+            Action onCompleted);
+    }
+
 }
