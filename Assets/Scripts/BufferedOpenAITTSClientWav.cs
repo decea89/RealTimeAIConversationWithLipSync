@@ -57,15 +57,44 @@ namespace MVP.Conversation
             }
 
             byte[] wavBytes = request.downloadHandler.data;
+
             if (wavBytes == null || wavBytes.Length == 0)
             {
                 onComplete?.Invoke(null, "BufferedOpenAITTSClientWav: respuesta WAV vacía.");
                 yield break;
             }
 
+            Debug.Log($"[BufferedOpenAITTSClientWav] WAV raw length={wavBytes.Length} bytes");
+
+            int previewLen = Mathf.Min(32, wavBytes.Length);
+            System.Text.StringBuilder sb = new System.Text.StringBuilder();
+            for (int i = 0; i < previewLen; i++)
+            {
+                sb.Append(wavBytes[i].ToString("X2"));
+                if (i < previewLen - 1) sb.Append(" ");
+            }
+            Debug.Log($"[BufferedOpenAITTSClientWav] WAV header hex preview (32 bytes): {sb}");
+
+            // if (wavBytes == null || wavBytes.Length == 0)
+            // {
+            //     onComplete?.Invoke(null, "BufferedOpenAITTSClientWav: respuesta WAV vacía.");
+            //     yield break;
+            // }
+
+            // AudioClip clip = WavUtility.ToAudioClip(wavBytes, "OpenAI_TTS_WAV");
+            // if (clip == null)
+            // {
+            //     onComplete?.Invoke(null, "BufferedOpenAITTSClientWav: no se pudo decodificar el WAV.");
+            //     yield break;
+            // }
+
+            // Debug.Log($"[BufferedOpenAITTSClientWav] WAV bytes={wavBytes.Length}, clipLength={clip.length:F2}s, frequency={clip.frequency}, channels={clip.channels}");
+            // onComplete?.Invoke(clip, null);
+
             AudioClip clip = WavUtility.ToAudioClip(wavBytes, "OpenAI_TTS_WAV");
             if (clip == null)
             {
+                Debug.LogError("[BufferedOpenAITTSClientWav] WavUtility.ToAudioClip devolvió null.");
                 onComplete?.Invoke(null, "BufferedOpenAITTSClientWav: no se pudo decodificar el WAV.");
                 yield break;
             }

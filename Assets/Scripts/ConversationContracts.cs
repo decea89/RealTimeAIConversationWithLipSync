@@ -29,5 +29,4 @@ namespace MVP.Conversation
             Action<string> onError,
             Action onCompleted);
     }
-
 }

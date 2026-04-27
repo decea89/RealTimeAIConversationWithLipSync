@@ -29,6 +29,8 @@ namespace MVP.Conversation
         [Header("Optional UI")]
         [SerializeField] private TMP_InputField debugInputField;
         [SerializeField] private Button debugSendButton;
+        [SerializeField] private bool sendInputFieldOnEnter = true;
+        [SerializeField] private bool clearInputFieldAfterSend = false;
 
         [SerializeField] private KeyCode playDebugCapturedClipKey = KeyCode.P;
         [SerializeField] private StreamingOpenAITTSClient streamingDebugClient;
@@ -70,20 +72,29 @@ namespace MVP.Conversation
                 Debug.LogError("[OpenAIConversationController] Avatar AudioSource is not assigned.");
 
             if (microphoneRecorder == null)
-                Debug.LogError("[OpenAIConversationController] MicrophoneRecorder is not assigned.");
+                Debug.LogWarning("[OpenAIConversationController] MicrophoneRecorder is not assigned. Text mode can still work.");
 
-            if (debugSendButton != null && debugInputField != null)
-            {
-                debugSendButton.onClick.AddListener(() =>
-                {
-                    if (!string.IsNullOrWhiteSpace(debugInputField.text))
-                        StartTextConversation(debugInputField.text);
-                });
-            }
+            if (debugSendButton != null)
+                debugSendButton.onClick.AddListener(SendDebugInputFieldText);
         }
 
         private void Update()
         {
+            if (Input.GetKeyDown(playDebugCapturedClipKey) && streamingDebugClient != null)
+            {
+                streamingDebugClient.PlayDebugCapturedClip(avatarAudioSource);
+            }
+
+            if (sendInputFieldOnEnter &&
+                debugInputField != null &&
+                debugInputField.isFocused &&
+                !isRunningConversation &&
+                (Input.GetKeyDown(KeyCode.Return) || Input.GetKeyDown(KeyCode.KeypadEnter)))
+            {
+                SendDebugInputFieldText();
+                return;
+            }
+
             if (!useKeyboardDebugShortcut || microphoneRecorder == null)
                 return;
 
@@ -92,12 +103,23 @@ namespace MVP.Conversation
 
             if (Input.GetKeyUp(keyboardDebugKey))
                 EndPushToTalkAndSend();
-
-            if (Input.GetKeyDown(playDebugCapturedClipKey) && streamingDebugClient != null)
-            {
-                streamingDebugClient.PlayDebugCapturedClip(avatarAudioSource);
-            }
         }
+
+        private void SendDebugInputFieldText()
+        {
+            if (debugInputField == null)
+                return;
+
+            string text = debugInputField.text;
+            if (string.IsNullOrWhiteSpace(text))
+                return;
+
+            StartTextConversation(text);
+
+            if (clearInputFieldAfterSend)
+                debugInputField.text = string.Empty;
+        }
+
 
         public void StartTextConversation(string userText)
         {
