@@ -1,4 +1,5 @@
 using System.Collections;
+using System.Collections.Generic;
 using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
@@ -8,9 +9,9 @@ namespace MVP.Conversation
     public class OpenAIConversationController : MonoBehaviour
     {
         [Header("Dependencies")]
-        [SerializeField] private MonoBehaviour chatServiceBehaviour; // IChatService
-        [SerializeField] private MonoBehaviour sttServiceBehaviour;  // ISTTService
-        [SerializeField] private MonoBehaviour ttsServiceBehaviour;  // ITTSService
+        [SerializeField] private MonoBehaviour chatServiceBehaviour;   // IChatService
+        [SerializeField] private MonoBehaviour sttServiceBehaviour;    // ISTTService
+        [SerializeField] private MonoBehaviour ttsServiceBehaviour;    // ITTSService o IStreamingTTSService
         [SerializeField] private MicrophoneRecorder microphoneRecorder;
         [SerializeField] private AudioSource avatarAudioSource;
         [SerializeField] private ConversationDebugView debugView;
@@ -28,10 +29,16 @@ namespace MVP.Conversation
         [Header("Optional UI")]
         [SerializeField] private TMP_InputField debugInputField;
         [SerializeField] private Button debugSendButton;
+        [SerializeField] private bool sendInputFieldOnEnter = true;
+        [SerializeField] private bool clearInputFieldAfterSend = false;
+
+        [SerializeField] private KeyCode playDebugCapturedClipKey = KeyCode.P;
+        [SerializeField] private StreamingOpenAITTSClient streamingDebugClient;
 
         private IChatService chatService;
         private ISTTService sttService;
         private ITTSService ttsService;
+        private IStreamingTTSService streamingTtsService;
 
         private bool isRunningConversation;
         private bool isHoldingToTalk;
@@ -47,7 +54,10 @@ namespace MVP.Conversation
                 sttService = sttServiceBehaviour as ISTTService;
 
             if (ttsServiceBehaviour != null)
+            {
                 ttsService = ttsServiceBehaviour as ITTSService;
+                streamingTtsService = ttsServiceBehaviour as IStreamingTTSService;
+            }
 
             if (chatService == null)
                 Debug.LogError("[OpenAIConversationController] Chat service behaviour is not set or does not implement IChatService.");
@@ -55,27 +65,36 @@ namespace MVP.Conversation
             if (sttServiceBehaviour != null && sttService == null)
                 Debug.LogError("[OpenAIConversationController] STT service behaviour is set but does not implement ISTTService.");
 
-            if (ttsService == null)
-                Debug.LogError("[OpenAIConversationController] TTS service behaviour is not set or does not implement ITTSService.");
+            if (ttsService == null && streamingTtsService == null)
+                Debug.LogError("[OpenAIConversationController] TTS service behaviour is not set or does not implement ITTSService or IStreamingTTSService.");
 
             if (avatarAudioSource == null)
                 Debug.LogError("[OpenAIConversationController] Avatar AudioSource is not assigned.");
 
             if (microphoneRecorder == null)
-                Debug.LogError("[OpenAIConversationController] MicrophoneRecorder is not assigned.");
+                Debug.LogWarning("[OpenAIConversationController] MicrophoneRecorder is not assigned. Text mode can still work.");
 
-            if (debugSendButton != null && debugInputField != null)
-            {
-                debugSendButton.onClick.AddListener(() =>
-                {
-                    if (!string.IsNullOrWhiteSpace(debugInputField.text))
-                        StartTextConversation(debugInputField.text);
-                });
-            }
+            if (debugSendButton != null)
+                debugSendButton.onClick.AddListener(SendDebugInputFieldText);
         }
 
         private void Update()
         {
+            if (Input.GetKeyDown(playDebugCapturedClipKey) && streamingDebugClient != null)
+            {
+                streamingDebugClient.PlayDebugCapturedClip(avatarAudioSource);
+            }
+
+            if (sendInputFieldOnEnter &&
+                debugInputField != null &&
+                debugInputField.isFocused &&
+                !isRunningConversation &&
+                (Input.GetKeyDown(KeyCode.Return) || Input.GetKeyDown(KeyCode.KeypadEnter)))
+            {
+                SendDebugInputFieldText();
+                return;
+            }
+
             if (!useKeyboardDebugShortcut || microphoneRecorder == null)
                 return;
 
@@ -85,6 +104,22 @@ namespace MVP.Conversation
             if (Input.GetKeyUp(keyboardDebugKey))
                 EndPushToTalkAndSend();
         }
+
+        private void SendDebugInputFieldText()
+        {
+            if (debugInputField == null)
+                return;
+
+            string text = debugInputField.text;
+            if (string.IsNullOrWhiteSpace(text))
+                return;
+
+            StartTextConversation(text);
+
+            if (clearInputFieldAfterSend)
+                debugInputField.text = string.Empty;
+        }
+
 
         public void StartTextConversation(string userText)
         {
@@ -148,8 +183,11 @@ namespace MVP.Conversation
         private IEnumerator RunTextConversation(string userText)
         {
             isRunningConversation = true;
-            var result = new ConversationResult();
-            result.userText = userText;
+
+            var result = new ConversationResult
+            {
+                userText = userText
+            };
             result.timing.StartTotal();
 
             UpdateDebugState("Chat", "Procesando entrada de texto...");
@@ -184,7 +222,8 @@ namespace MVP.Conversation
 
             result.assistantText = chatResult.responseText;
             result.emotion = chatResult.emotion;
-            result.intentTags = chatResult.intentTags ?? new System.Collections.Generic.List<IntentTag>();
+            result.intentTags = chatResult.intentTags ?? new List<IntentTag>();
+
             emotionController?.ApplyEmotion(result.emotion, result.intentTags);
 
             yield return PlayAssistantReplyWithTts(result);
@@ -197,6 +236,7 @@ namespace MVP.Conversation
         private IEnumerator RunVoiceConversationFromClip(AudioClip clip)
         {
             isRunningConversation = true;
+
             var result = new ConversationResult();
             result.timing.StartTotal();
 
@@ -282,7 +322,8 @@ namespace MVP.Conversation
 
             result.assistantText = chatResult.responseText;
             result.emotion = chatResult.emotion;
-            result.intentTags = chatResult.intentTags ?? new System.Collections.Generic.List<IntentTag>();
+            result.intentTags = chatResult.intentTags ?? new List<IntentTag>();
+
             emotionController?.ApplyEmotion(result.emotion, result.intentTags);
 
             yield return PlayAssistantReplyWithTts(result);
@@ -294,16 +335,65 @@ namespace MVP.Conversation
 
         private IEnumerator PlayAssistantReplyWithTts(ConversationResult result)
         {
-            if (ttsService == null)
+            if (string.IsNullOrWhiteSpace(result.assistantText))
             {
-                result.error = "TTS service not configured.";
+                result.error = "assistantText está vacío, no hay nada que sintetizar.";
                 UpdateDebugState("Error", result.error);
                 yield break;
             }
 
-            if (string.IsNullOrWhiteSpace(result.assistantText))
+            if (streamingTtsService != null)
             {
-                result.error = "assistantText está vacío, no hay nada que sintetizar.";
+                UpdateDebugState("TTS", "Generando audio streaming...");
+                result.timing.StartTts();
+
+                string streamingError = null;
+                bool playbackMarked = false;
+
+                yield return streamingTtsService.RequestSpeechStreamed(
+                    result.assistantText,
+                    avatarAudioSource,
+                    onPlaybackStarted: () =>
+                    {
+                        if (playbackMarked)
+                            return;
+
+                        playbackMarked = true;
+                        result.timing.StopTts();
+                        result.timing.MarkPlaybackStart();
+                        UpdateDebugState("Speaking", "Reproduciendo audio streaming...");
+                    },
+                    onError: err =>
+                    {
+                        streamingError = err;
+                    },
+                    onCompleted: () =>
+                    {
+                        result.timing.MarkPlaybackEnd();
+                    });
+
+                if (!string.IsNullOrEmpty(streamingError))
+                {
+                    result.error = streamingError;
+                    UpdateDebugState("Error", streamingError);
+                    yield break;
+                }
+
+                if (!playbackMarked)
+                {
+                    result.timing.StopTts();
+                    result.timing.MarkPlaybackStart();
+                }
+
+                if (result.timing.playbackEndTime <= 0.0)
+                    result.timing.MarkPlaybackEnd();
+
+                yield break;
+            }
+
+            if (ttsService == null)
+            {
+                result.error = "TTS service not configured.";
                 UpdateDebugState("Error", result.error);
                 yield break;
             }
@@ -322,9 +412,16 @@ namespace MVP.Conversation
 
             result.timing.StopTts();
 
-            if (!string.IsNullOrEmpty(ttsError) || ttsClip == null)
+            if (!string.IsNullOrEmpty(ttsError))
             {
-                result.error = string.IsNullOrEmpty(ttsError) ? "TTS devolvió un clip nulo." : ttsError;
+                result.error = ttsError;
+                UpdateDebugState("Error", ttsError);
+                yield break;
+            }
+
+            if (ttsClip == null)
+            {
+                result.error = "TTS devolvió un clip nulo.";
                 UpdateDebugState("Error", result.error);
                 yield break;
             }
@@ -337,6 +434,8 @@ namespace MVP.Conversation
             result.timing.MarkPlaybackStart();
 
             yield return new WaitForSeconds(ttsClip.length);
+
+            result.timing.MarkPlaybackEnd();
         }
 
         private void LogTiming(ConversationResult result)
@@ -346,7 +445,10 @@ namespace MVP.Conversation
 
             string timingText =
                 $"STT: {result.timing.SttSeconds:F2}s | Chat: {result.timing.ChatSeconds:F2}s | TTS: {result.timing.TtsSeconds:F2}s\n" +
-                $"Time to first audio: {result.timing.TimeToFirstAudioSeconds:F2}s | Turn complete: {result.timing.TurnCompleteSeconds:F2}s";
+                $"Time to first audio: {result.timing.TimeToFirstAudioSeconds:F2}s | " +
+                $"Playback duration: {result.timing.PlaybackDurationSeconds:F2}s | " +
+                $"Time to playback end: {result.timing.TimeToPlaybackEndSeconds:F2}s | " +
+                $"Turn coroutine complete: {result.timing.TurnCompleteSeconds:F2}s";
 
             if (includeAssistantTextInTimingView && !string.IsNullOrWhiteSpace(result.assistantText))
                 timingText += $"\n\nAI: {result.assistantText}";
