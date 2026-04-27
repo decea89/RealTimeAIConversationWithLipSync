@@ -7500,11 +7500,11 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 2938b2a3ea0a5a040a7cd2974cc1c5b4, type: 3}
   m_Name: 
   m_EditorClassIdentifier: '::'
-  innerTtsClientWav: {fileID: 1029204957}
-  innerTtsClient: {fileID: 1422865311}
+  innerTtsServiceBehaviour: {fileID: 1422865311}
   maxSegmentChars: 140
-  silenceBetweenSegmentsSeconds: 0.06
   logSegments: 1
+  transitionPaddingSeconds: 0.015
+  maxWaitForNextSegmentSeconds: 2.5
 --- !u!4 &1822814994
 Transform:
   m_ObjectHideFlags: 0

@@ -9,17 +9,30 @@ namespace MVP.Conversation
     public class SegmentedBufferedTTSClient : MonoBehaviour, ITTSService, IStreamingTTSService
     {
         [Header("Dependencies")]
-        [SerializeField] private BufferedOpenAITTSClientWav innerTtsClientWav;
-        [SerializeField] private BufferedOpenAITTSClientPcm innerTtsClient;
+        [SerializeField] private MonoBehaviour innerTtsServiceBehaviour;
 
         [Header("Segmentation")]
         [SerializeField] private int maxSegmentChars = 140;
-        [SerializeField] private float silenceBetweenSegmentsSeconds = 0.06f;
         [SerializeField] private bool logSegments = true;
+
+        [Header("Playback")]
+        [SerializeField] private float transitionPaddingSeconds = 0.015f;
+        [SerializeField] private float maxWaitForNextSegmentSeconds = 2.5f;
+
+        private ITTSService innerTtsService;
+
+        private void Awake()
+        {
+            if (innerTtsServiceBehaviour != null)
+                innerTtsService = innerTtsServiceBehaviour as ITTSService;
+
+            if (innerTtsService == null)
+                Debug.LogError("[SegmentedBufferedTTSClient] innerTtsServiceBehaviour no implementa ITTSService.");
+        }
 
         public IEnumerator RequestSpeech(string text, Action<AudioClip, string> onComplete)
         {
-            onComplete?.Invoke(null, "SegmentedBufferedTTSClient: Ruta ITTSService (clip fusionado) no implementada en esta versión. Usa IStreamingTTSService.");
+            onComplete?.Invoke(null, "SegmentedBufferedTTSClient: esta versión está pensada para IStreamingTTSService, no devuelve clip fusionado.");
             yield break;
         }
 
@@ -36,62 +49,76 @@ namespace MVP.Conversation
                 yield break;
             }
 
-            if (innerTtsClient == null)
-            {
-                onError?.Invoke("SegmentedBufferedTTSClient: innerTtsClient no asignado.");
-                yield break;
-            }
-
             if (targetAudioSource == null)
             {
                 onError?.Invoke("SegmentedBufferedTTSClient: targetAudioSource nulo.");
                 yield break;
             }
 
-            List<string> segments = SplitIntoSegments(text, maxSegmentChars);
-            if (segments.Count == 0)
+            if (innerTtsService == null)
             {
-                onError?.Invoke("SegmentedBufferedTTSClient: no hay segmentos válidos.");
+                onError?.Invoke("SegmentedBufferedTTSClient: innerTtsService no configurado.");
                 yield break;
             }
 
-            segments = PostProcessSegments(segments);
+            List<string> segments = SplitIntoSegments(text, maxSegmentChars);
+            if (segments == null || segments.Count == 0)
+            {
+                onError?.Invoke("SegmentedBufferedTTSClient: no se generaron segmentos válidos.");
+                yield break;
+            }
 
             if (logSegments)
+            {
                 Debug.Log($"[SegmentedBufferedTTSClient] Segmentos={segments.Count}");
+                for (int i = 0; i < segments.Count; i++)
+                    Debug.Log($"[SegmentedBufferedTTSClient] [{i + 1}/{segments.Count}] {segments[i]}");
+            }
 
             bool playbackStarted = false;
 
+            SegmentRequest current = new SegmentRequest(0, segments[0]);
+            yield return StartCoroutine(RequestSegmentCoroutine(current));
+
+            if (!string.IsNullOrEmpty(current.error))
+            {
+                onError?.Invoke(current.error);
+                yield break;
+            }
+
+            if (current.clip == null)
+            {
+                onError?.Invoke("SegmentedBufferedTTSClient: el primer segmento devolvió clip nulo.");
+                yield break;
+            }
+
+            SegmentRequest next = null;
+            Coroutine nextRequestCoroutine = null;
+
             for (int i = 0; i < segments.Count; i++)
             {
-                string segment = segments[i];
+                current.index = i;
+                current.text = segments[i];
 
-                if (logSegments)
-                    Debug.Log($"[SegmentedBufferedTTSClient] [{i + 1}/{segments.Count}] {segment}");
-
-                AudioClip segmentClip = null;
-                string segmentError = null;
-
-                yield return innerTtsClient.RequestSpeech(segment, (clip, err) =>
-                {
-                    segmentClip = clip;
-                    segmentError = err;
-                });
-
-                if (!string.IsNullOrEmpty(segmentError))
-                {
-                    onError?.Invoke($"SegmentedBufferedTTSClient: error en segmento {i + 1}: {segmentError}");
-                    yield break;
-                }
-
-                if (segmentClip == null)
+                if (current.clip == null)
                 {
                     onError?.Invoke($"SegmentedBufferedTTSClient: clip nulo en segmento {i + 1}.");
                     yield break;
                 }
 
+                if (i + 1 < segments.Count)
+                {
+                    next = new SegmentRequest(i + 1, segments[i + 1]);
+                    nextRequestCoroutine = StartCoroutine(RequestSegmentCoroutine(next));
+                }
+                else
+                {
+                    next = null;
+                    nextRequestCoroutine = null;
+                }
+
                 targetAudioSource.Stop();
-                targetAudioSource.clip = segmentClip;
+                targetAudioSource.clip = current.clip;
                 targetAudioSource.Play();
 
                 if (!playbackStarted)
@@ -100,133 +127,156 @@ namespace MVP.Conversation
                     onPlaybackStarted?.Invoke();
                 }
 
-                float segmentLength = segmentClip.length;
-                float endTime = Time.time + segmentLength;
+                float waitTime = Mathf.Max(0f, current.clip.length - transitionPaddingSeconds);
+                float playEnd = Time.time + waitTime;
 
-                while (Time.time < endTime)
-                {
+                while (Time.time < playEnd)
                     yield return null;
-                }
 
-                if (i < segments.Count - 1)
+                if (next != null)
                 {
-                    // Pausa proporcional a la duración, limitada a un rango.
-                    float baseGap = silenceBetweenSegmentsSeconds; // tu valor "medio".
-                    float dynamicGap = Mathf.Clamp(segmentLength * 0.15f, 0.03f, baseGap * 1.5f);
+                    float waitDeadline = Time.time + maxWaitForNextSegmentSeconds;
 
-                    float gapEnd = Time.time + dynamicGap;
-                    while (Time.time < gapEnd)
-                    {
+                    while (!next.isDone && Time.time < waitDeadline)
                         yield return null;
+
+                    if (!next.isDone)
+                    {
+                        if (nextRequestCoroutine != null)
+                            StopCoroutine(nextRequestCoroutine);
+
+                        onError?.Invoke($"SegmentedBufferedTTSClient: timeout esperando el segmento {next.index + 1}.");
+                        yield break;
+                    }
+
+                    if (!string.IsNullOrEmpty(next.error))
+                    {
+                        onError?.Invoke(next.error);
+                        yield break;
+                    }
+
+                    if (next.clip == null)
+                    {
+                        onError?.Invoke($"SegmentedBufferedTTSClient: clip nulo en segmento {next.index + 1}.");
+                        yield break;
                     }
                 }
+
+                current = next;
             }
+
+            while (targetAudioSource.isPlaying)
+                yield return null;
 
             onCompleted?.Invoke();
         }
 
-private List<string> SplitIntoSegments(string text, int maxChars)
-{
-    string normalized = text.Replace("\r", " ").Replace("\n", " ").Trim();
-    normalized = Regex.Replace(normalized, @"\s+", " ");
-
-    // Cortamos por frases (., !, ?, :, ;) pero sin perder los delimitadores.
-    string[] rawPieces = Regex.Split(normalized, @"(?<=[\.!\?:;])\s+");
-
-    List<string> sentences = new List<string>();
-    foreach (string piece in rawPieces)
-    {
-        string trimmed = piece.Trim();
-        if (!string.IsNullOrWhiteSpace(trimmed))
-            sentences.Add(trimmed);
-    }
-
-    if (sentences.Count == 0 && !string.IsNullOrWhiteSpace(normalized))
-        sentences.Add(normalized);
-
-    List<string> segments = new List<string>();
-    string current = "";
-
-    foreach (string sentence in sentences)
-    {
-        // Si cabe entero y el acumulado está razonable, lo añadimos al actual.
-        string candidate = string.IsNullOrEmpty(current)
-            ? sentence
-            : current + " " + sentence;
-
-        if (candidate.Length <= maxChars)
+        private IEnumerator RequestSegmentCoroutine(SegmentRequest request)
         {
-            current = candidate;
-            continue;
-        }
+            if (request == null)
+                yield break;
 
-        // Si lo nuevo revienta el límite, cerramos el segmento actual.
-        if (!string.IsNullOrEmpty(current))
-            segments.Add(current.Trim());
+            AudioClip segmentClip = null;
+            string segmentError = null;
 
-        // Ahora tratamos esta frase: si también es muy larga, la troceamos por palabras.
-        if (sentence.Length <= maxChars)
-        {
-            current = sentence;
-        }
-        else
-        {
-            string[] words = sentence.Split(' ');
-            current = "";
-
-            foreach (string word in words)
+            yield return innerTtsService.RequestSpeech(request.text, (clip, err) =>
             {
-                string wordCandidate = string.IsNullOrEmpty(current)
-                    ? word
-                    : current + " " + word;
+                segmentClip = clip;
+                segmentError = err;
+            });
 
-                if (wordCandidate.Length > maxChars && !string.IsNullOrEmpty(current))
+            request.clip = segmentClip;
+            request.error = segmentError;
+            request.isDone = true;
+        }
+
+        private List<string> SplitIntoSegments(string text, int maxChars)
+        {
+            string normalized = text.Replace("\r", " ").Replace("\n", " ").Trim();
+            normalized = Regex.Replace(normalized, @"\s+", " ");
+
+            string[] rawPieces = Regex.Split(normalized, @"(?<=[\.!\?:;])\s+");
+
+            List<string> sentences = new List<string>();
+            foreach (string piece in rawPieces)
+            {
+                string trimmed = piece.Trim();
+                if (!string.IsNullOrWhiteSpace(trimmed))
+                    sentences.Add(trimmed);
+            }
+
+            if (sentences.Count == 0 && !string.IsNullOrWhiteSpace(normalized))
+                sentences.Add(normalized);
+
+            List<string> segments = new List<string>();
+            string current = "";
+
+            foreach (string sentence in sentences)
+            {
+                string candidate = string.IsNullOrEmpty(current)
+                    ? sentence
+                    : current + " " + sentence;
+
+                if (candidate.Length <= maxChars)
                 {
+                    current = candidate;
+                    continue;
+                }
+
+                if (!string.IsNullOrEmpty(current))
                     segments.Add(current.Trim());
-                    current = word;
+
+                if (sentence.Length <= maxChars)
+                {
+                    current = sentence;
                 }
                 else
                 {
-                    current = wordCandidate;
+                    string[] words = sentence.Split(' ');
+                    current = "";
+
+                    foreach (string word in words)
+                    {
+                        string wordCandidate = string.IsNullOrEmpty(current)
+                            ? word
+                            : current + " " + word;
+
+                        if (wordCandidate.Length > maxChars && !string.IsNullOrEmpty(current))
+                        {
+                            segments.Add(current.Trim());
+                            current = word;
+                        }
+                        else
+                        {
+                            current = wordCandidate;
+                        }
+                    }
                 }
             }
+
+            if (!string.IsNullOrWhiteSpace(current))
+                segments.Add(current.Trim());
+
+            return segments;
         }
-    }
 
-    if (!string.IsNullOrWhiteSpace(current))
-        segments.Add(current.Trim());
-
-    return segments;
-}
-
-private List<string> PostProcessSegments(List<string> segments, int shortThreshold = 18)
-{
-    if (segments == null || segments.Count == 0)
-        return segments;
-
-    List<string> merged = new List<string>();
-    string current = segments[0];
-
-    for (int i = 1; i < segments.Count; i++)
-    {
-        string next = segments[i];
-
-        if (current.Length < shortThreshold && next.Length < shortThreshold)
+        [Serializable]
+        private class SegmentRequest
         {
-            current = current + " " + next;
+            public int index;
+            public string text;
+            public AudioClip clip;
+            public string error;
+            public bool isDone;
+
+            public SegmentRequest(int index, string text)
+            {
+                this.index = index;
+                this.text = text;
+                clip = null;
+                error = null;
+                isDone = false;
+            }
         }
-        else
-        {
-            merged.Add(current);
-            current = next;
-        }
-    }
-
-    if (!string.IsNullOrWhiteSpace(current))
-        merged.Add(current);
-
-    return merged;
-}
-
     }
 }
