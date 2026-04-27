@@ -217,7 +217,7 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0.5, y: 1}
   m_AnchorMax: {x: 0.5, y: 1}
-  m_AnchoredPosition: {x: 100, y: -600}
+  m_AnchoredPosition: {x: 100, y: -531.1}
   m_SizeDelta: {x: 400, y: 400}
   m_Pivot: {x: 0.5, y: 1}
 --- !u!114 &178414140
@@ -249,8 +249,8 @@ MonoBehaviour:
   m_fontMaterials: []
   m_fontColor32:
     serializedVersion: 2
-    rgba: 4279900698
-  m_fontColor: {r: 0.1, g: 0.1, b: 0.1, a: 1}
+    rgba: 4278190335
+  m_fontColor: {r: 1, g: 0, b: 0, a: 1}
   m_enableVertexGradient: 0
   m_colorMode: 3
   m_fontColorGradient:
@@ -273,7 +273,7 @@ MonoBehaviour:
   m_enableAutoSizing: 0
   m_fontSizeMin: 18
   m_fontSizeMax: 72
-  m_fontStyle: 0
+  m_fontStyle: 1
   m_HorizontalAlignment: 1
   m_VerticalAlignment: 256
   m_textAlignment: 65535
@@ -537,6 +537,65 @@ MonoBehaviour:
   m_ShadowLayerMask: 1
   m_RenderingLayers: 1
   m_ShadowRenderingLayers: 1
+--- !u!1 &524866761
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 524866763}
+  - component: {fileID: 524866762}
+  m_Layer: 0
+  m_Name: StreamingTTS
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!114 &524866762
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 524866761}
+  m_Enabled: 0
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: c2e88891ee7c9bb499cdc9030df01f09, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::MVP.Conversation.StreamingOpenAITTSClient
+  apiKey: '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 '
+  endpoint: https://api.openai.com/v1/audio/speech
+  model: gpt-4o-mini-tts
+  voice: echo
+  instructions: Speak in a warm, natural, conversational tone suitable for a VR character.
+    Keep the pacing clear and slightly expressive.
+  sampleRate: 24000
+  channels: 1
+  maxClipSeconds: 60
+  prebufferSeconds: 0.35
+  drainGraceSeconds: 0.4
+  logChunks: 1
+  captureFullPcmForDebug: 1
+  logExpectedDuration: 1
+  buildDebugClipOnComplete: 1
+--- !u!4 &524866763
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 524866761}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 1136413632}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &532476717
 GameObject:
   m_ObjectHideFlags: 0
@@ -665,7 +724,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 1
+  m_IsActive: 0
 --- !u!114 &574817455
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -733,6 +792,57 @@ Transform:
   - {fileID: 395058537}
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!1 &725724492
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 725724493}
+  - component: {fileID: 725724494}
+  m_Layer: 0
+  m_Name: BackendChatClient
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &725724493
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 725724492}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 1136413632}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &725724494
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 725724492}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 679f20c5578be0847bc909e3aec34a67, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::MVP.Conversation.CharacterBackendChatClient
+  baseUrl: https://your-backend.example.com
+  chatPath: /chat
+  bearerToken: YOUR_BACKEND_TOKEN
+  characterId: default_character
+  locale: es-ES
+  logRequests: 0
+  logResponses: 0
 --- !u!1 &817902945
 GameObject:
   m_ObjectHideFlags: 0
@@ -851,6 +961,56 @@ Transform:
   m_CorrespondingSourceObject: {fileID: 400016, guid: cbaf1c32e7ec84f10a51be1b09c0ef46, type: 3}
   m_PrefabInstance: {fileID: 1956074370}
   m_PrefabAsset: {fileID: 0}
+--- !u!1 &1029204955
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1029204958}
+  - component: {fileID: 1029204957}
+  m_Layer: 0
+  m_Name: BufferedTTSWav
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!114 &1029204957
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1029204955}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 722774edb04457847992b1d1cb43e1b6, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::MVP.Conversation.BufferedOpenAITTSClientWav
+  apiKey: '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 '
+  endpoint: https://api.openai.com/v1/audio/speech
+  model: gpt-4o-mini-tts
+  voice: echo
+  instructions: Speak in a warm, natural, conversational tone suitable for a VR character.
+    Keep the pacing clear and slightly expressive.
+--- !u!4 &1029204958
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1029204955}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 1136413632}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1001 &1044896423
 PrefabInstance:
   m_ObjectHideFlags: 0
@@ -1234,7 +1394,12 @@ Transform:
   m_LocalPosition: {x: 0, y: 0, z: 0}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
-  m_Children: []
+  m_Children:
+  - {fileID: 725724493}
+  - {fileID: 524866763}
+  - {fileID: 1029204958}
+  - {fileID: 1422865310}
+  - {fileID: 1822814994}
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!114 &1136413633
@@ -1244,7 +1409,7 @@ MonoBehaviour:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1136413628}
-  m_Enabled: 1
+  m_Enabled: 0
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 3aa39b8dfccd2ee4a917ceee19d7a4b6, type: 3}
   m_Name: 
@@ -1326,7 +1491,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::MVP.Conversation.OpenAIConversationController
   chatServiceBehaviour: {fileID: 1136413634}
   sttServiceBehaviour: {fileID: 1136413637}
-  ttsServiceBehaviour: {fileID: 1136413633}
+  ttsServiceBehaviour: {fileID: 1822814993}
   microphoneRecorder: {fileID: 1136413635}
   avatarAudioSource: {fileID: 1956074376}
   debugView: {fileID: 2075737445}
@@ -1338,6 +1503,10 @@ MonoBehaviour:
   includeAssistantTextInTimingView: 1
   debugInputField: {fileID: 1454115001}
   debugSendButton: {fileID: 1821155629}
+  sendInputFieldOnEnter: 1
+  clearInputFieldAfterSend: 0
+  playDebugCapturedClipKey: 112
+  streamingDebugClient: {fileID: 524866762}
 --- !u!1 &1298907380
 GameObject:
   m_ObjectHideFlags: 0
@@ -1372,8 +1541,8 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0, y: 0}
   m_AnchorMax: {x: 1, y: 1}
-  m_AnchoredPosition: {x: 0, y: 0}
-  m_SizeDelta: {x: 0, y: 0}
+  m_AnchoredPosition: {x: 25, y: -25}
+  m_SizeDelta: {x: -50, y: -50}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &1298907382
 MonoBehaviour:
@@ -1422,13 +1591,13 @@ MonoBehaviour:
   m_faceColor:
     serializedVersion: 2
     rgba: 4294967295
-  m_fontSize: 30
-  m_fontSizeBase: 30
+  m_fontSize: 45
+  m_fontSizeBase: 45
   m_fontWeight: 400
   m_enableAutoSizing: 0
   m_fontSizeMin: 18
   m_fontSizeMax: 72
-  m_fontStyle: 0
+  m_fontStyle: 1
   m_HorizontalAlignment: 1
   m_VerticalAlignment: 256
   m_textAlignment: 65535
@@ -1475,6 +1644,58 @@ CanvasRenderer:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1298907380}
   m_CullTransparentMesh: 1
+--- !u!1 &1422865309
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1422865310}
+  - component: {fileID: 1422865311}
+  m_Layer: 0
+  m_Name: BufferedTTSPmc
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &1422865310
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1422865309}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 1136413632}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &1422865311
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1422865309}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: db1f81cd3319ecf4ab39d807d4f4cad2, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: '::'
+  apiKey: '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 '
+  endpoint: https://api.openai.com/v1/audio/speech
+  model: gpt-4o-mini-tts
+  voice: echo
+  sampleRate: 24000
+  channels: 1
+  instructions: Speak in a warm, natural, conversational tone suitable for a VR character.
+    Keep the pacing clear and slightly expressive.
 --- !u!1 &1454114999
 GameObject:
   m_ObjectHideFlags: 0
@@ -1493,7 +1714,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 0
+  m_IsActive: 1
 --- !u!224 &1454115000
 RectTransform:
   m_ObjectHideFlags: 0
@@ -1503,7 +1724,7 @@ RectTransform:
   m_GameObject: {fileID: 1454114999}
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
   m_LocalPosition: {x: 0, y: 0, z: 0}
-  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_LocalScale: {x: 2.6915, y: 2.6915, z: 2.6915}
   m_ConstrainProportionsScale: 0
   m_Children:
   - {fileID: 1604353938}
@@ -1511,7 +1732,7 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0.5, y: 0.5}
   m_AnchorMax: {x: 0.5, y: 0.5}
-  m_AnchoredPosition: {x: 0, y: 0}
+  m_AnchoredPosition: {x: -569, y: 344}
   m_SizeDelta: {x: 160, y: 30}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &1454115001
@@ -7147,7 +7368,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 0
+  m_IsActive: 1
 --- !u!224 &1821155628
 RectTransform:
   m_ObjectHideFlags: 0
@@ -7157,7 +7378,7 @@ RectTransform:
   m_GameObject: {fileID: 1821155627}
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
   m_LocalPosition: {x: 0, y: 0, z: 0}
-  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_LocalScale: {x: 2.6915, y: 2.6915, z: 2.6915}
   m_ConstrainProportionsScale: 0
   m_Children:
   - {fileID: 1592587664}
@@ -7165,7 +7386,7 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0.5, y: 0.5}
   m_AnchorMax: {x: 0.5, y: 0.5}
-  m_AnchoredPosition: {x: -105.76, y: 0}
+  m_AnchoredPosition: {x: -853.62946, y: 344}
   m_SizeDelta: {x: 50, y: 30}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &1821155629
@@ -7250,6 +7471,55 @@ CanvasRenderer:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1821155627}
   m_CullTransparentMesh: 1
+--- !u!1 &1822814992
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1822814994}
+  - component: {fileID: 1822814993}
+  m_Layer: 0
+  m_Name: SegmentedBufferedTTS
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!114 &1822814993
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1822814992}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 2938b2a3ea0a5a040a7cd2974cc1c5b4, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: '::'
+  innerTtsServiceBehaviour: {fileID: 1422865311}
+  maxSegmentChars: 140
+  logSegments: 1
+  transitionPaddingSeconds: 0.015
+  maxWaitForNextSegmentSeconds: 2.5
+--- !u!4 &1822814994
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1822814992}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 1136413632}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &1882508921
 GameObject:
   m_ObjectHideFlags: 0
@@ -7438,7 +7708,7 @@ MonoBehaviour:
   enableAcceleration: 1
   enableKeyboardInput: 0
   enableTouchInput: 0
-  audioLoopback: 0
+  audioLoopback: 1
   loopbackKey: 108
   showVisemes: 0
   debugVisemesKey: 100

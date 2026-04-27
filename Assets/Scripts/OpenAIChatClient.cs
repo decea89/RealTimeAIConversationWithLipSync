@@ -14,11 +14,13 @@ namespace MVP.Conversation
         [SerializeField] private string apiKey = "YOUR_OPENAI_API_KEY";
         [SerializeField] private string endpoint = "https://api.openai.com/v1/chat/completions";
         [SerializeField] private string model = "gpt-4o-mini";
+
         [SerializeField] [TextArea(3, 8)]
         private string systemPrompt =
             "You are a historical character speaking inside a VR experience. " +
             "Reply briefly, clearly, and with strong personality. " +
             "Default to one short sentence under 25 words unless the user explicitly asks for more detail.";
+
         [SerializeField] [Range(0f, 2f)] private float temperature = 0.5f;
         [SerializeField] private int maxCompletionTokens = 60;
 
@@ -80,25 +82,63 @@ namespace MVP.Conversation
         {
             string responseText = null;
             string error = null;
+            string rawJson = null;
 
-            yield return RequestChat(userMessage, (text, err) =>
+            var body = new ChatCompletionRequest
             {
-                responseText = text;
-                error = err;
-            });
+                model = model,
+                temperature = temperature,
+                max_completion_tokens = maxCompletionTokens,
+                messages = new List<Message>
+                {
+                    new Message { role = "system", content = systemPrompt },
+                    new Message { role = "user", content = userMessage }
+                }
+            };
 
-            if (!string.IsNullOrEmpty(error))
+            string json = JsonConvert.SerializeObject(body);
+            byte[] bodyRaw = Encoding.UTF8.GetBytes(json);
+
+            using var request = new UnityWebRequest(endpoint, UnityWebRequest.kHttpVerbPOST);
+            request.uploadHandler = new UploadHandlerRaw(bodyRaw);
+            request.downloadHandler = new DownloadHandlerBuffer();
+            request.SetRequestHeader("Content-Type", "application/json");
+            request.SetRequestHeader("Authorization", $"Bearer {apiKey}");
+
+            yield return request.SendWebRequest();
+
+            rawJson = request.downloadHandler.text;
+
+            if (request.result != UnityWebRequest.Result.Success)
             {
-                onComplete?.Invoke(null, error);
+                onComplete?.Invoke(null, request.error + "\n" + rawJson);
+                yield break;
+            }
+
+            ChatCompletionResponse parsed;
+            try
+            {
+                parsed = JsonConvert.DeserializeObject<ChatCompletionResponse>(rawJson);
+            }
+            catch (Exception e)
+            {
+                onComplete?.Invoke(null, "Error parseando JSON de OpenAI Chat: " + e.Message + "\nRAW:\n" + rawJson);
+                yield break;
+            }
+
+            responseText = parsed?.choices?[0]?.message?.content;
+            if (string.IsNullOrWhiteSpace(responseText))
+            {
+                onComplete?.Invoke(null, "Respuesta vacía o inválida de OpenAI Chat.\nRAW:\n" + rawJson);
                 yield break;
             }
 
             onComplete?.Invoke(new ChatServiceResult
             {
-                responseText = responseText,
+                responseText = responseText.Trim(),
                 emotion = CharacterEmotion.Neutral,
                 intentTags = new List<IntentTag>(),
-                rawJson = responseText
+                rawJson = rawJson
             }, null);
         }
 
