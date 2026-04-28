@@ -149,7 +149,8 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 017c5e3933235514c9520e1dace2a4b2, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Unity.XR.Interaction.Toolkit::UnityEngine.XR.Interaction.Toolkit.Inputs.InputActionManager
-  m_ActionAssets: []
+  m_ActionAssets:
+  - {fileID: -944628639613478452, guid: c348712bda248c246b8c49b3db54643f, type: 3}
 --- !u!114 &117966519
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -838,11 +839,14 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::MVP.Conversation.CharacterBackendChatClient
   baseUrl: https://your-backend.example.com
   chatPath: /chat
+  sessionResetPath: session/reset
   bearerToken: YOUR_BACKEND_TOKEN
-  characterId: default_character
+  characterId: francisco-de-vitoria
   locale: es-ES
+  optionalUserId: 
   logRequests: 0
   logResponses: 0
+  callResetEndpointOnNewUser: 0
 --- !u!1 &817902945
 GameObject:
   m_ObjectHideFlags: 0
@@ -1507,6 +1511,63 @@ MonoBehaviour:
   clearInputFieldAfterSend: 0
   playDebugCapturedClipKey: 112
   streamingDebugClient: {fileID: 524866762}
+--- !u!1 &1242671844
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1242671846}
+  - component: {fileID: 1242671845}
+  m_Layer: 0
+  m_Name: NewUserSessionInputHandler
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!114 &1242671845
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1242671844}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 5b9dc4dd20cae2843904caac5cf23ea6, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::NewUserSessionInputHandler
+  conversationController: {fileID: 1136413638}
+  newUserAction:
+    m_UseReference: 1
+    m_Action:
+      m_Name: New User
+      m_Type: 0
+      m_ExpectedControlType: 
+      m_Id: 26c84b54-e99f-4089-9fe4-c864e2cd9cec
+      m_Processors: 
+      m_Interactions: 
+      m_SingletonActionBindings: []
+      m_Flags: 0
+    m_Reference: {fileID: 9071043039555722582, guid: c348712bda248c246b8c49b3db54643f, type: 3}
+--- !u!4 &1242671846
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1242671844}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 853.2659, y: 966.7409, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &1298907380
 GameObject:
   m_ObjectHideFlags: 0
@@ -8108,3 +8169,4 @@ SceneRoots:
   - {fileID: 1638711506}
   - {fileID: 117966520}
   - {fileID: 574817456}
+  - {fileID: 1242671846}

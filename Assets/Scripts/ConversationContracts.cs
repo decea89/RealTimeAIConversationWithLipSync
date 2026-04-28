@@ -29,4 +29,9 @@ namespace MVP.Conversation
             Action<string> onError,
             Action onCompleted);
     }
+
+    public interface IConversationResettable
+    {
+        void ResetConversationContext();
+    }
 }

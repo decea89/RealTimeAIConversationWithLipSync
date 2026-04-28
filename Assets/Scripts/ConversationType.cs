@@ -31,5 +31,10 @@ namespace MVP.Conversation
         public CharacterEmotion emotion;
         public List<IntentTag> intentTags = new List<IntentTag>();
         public string rawJson;
+        public int latencyMs;
+        public string model;
+        public int ragHits;
+
+        public List<string> sourceTitles = new List<string>();
     }
 }
