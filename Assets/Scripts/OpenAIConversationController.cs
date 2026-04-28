@@ -32,9 +32,12 @@ namespace MVP.Conversation
         [SerializeField] private bool sendInputFieldOnEnter = true;
         [SerializeField] private bool clearInputFieldAfterSend = false;
 
+
+        [Header("Editor Debug")]
         [SerializeField] private KeyCode playDebugCapturedClipKey = KeyCode.P;
         [SerializeField] private StreamingOpenAITTSClient streamingDebugClient;
-
+        [SerializeField] private bool allowKeyboardNewUserDebug = true;
+        [SerializeField] private KeyCode newUserDebugKey = KeyCode.N;
         private IChatService chatService;
         private ISTTService sttService;
         private ITTSService ttsService;
@@ -78,12 +81,26 @@ namespace MVP.Conversation
                 debugSendButton.onClick.AddListener(SendDebugInputFieldText);
         }
 
+        /// <summary>
+        /// Start is called on the frame when a script is enabled just before
+        /// any of the Update methods is called the first time.
+        /// </summary>
+        void Start()
+        {
+            if (!SessionManager.HasActiveSession)
+            {
+                SessionManager.StartNewSession();
+                UpdateDebugState("Idle", $"Sesión inicial creada: {SessionManager.CurrentSessionId}");
+            }
+        }
+
         private void Update()
         {
             if (Input.GetKeyDown(playDebugCapturedClipKey) && streamingDebugClient != null)
             {
                 streamingDebugClient.PlayDebugCapturedClip(avatarAudioSource);
             }
+
 
             if (sendInputFieldOnEnter &&
                 debugInputField != null &&
@@ -95,6 +112,7 @@ namespace MVP.Conversation
                 return;
             }
 
+
             if (!useKeyboardDebugShortcut || microphoneRecorder == null)
                 return;
 
@@ -103,6 +121,11 @@ namespace MVP.Conversation
 
             if (Input.GetKeyUp(keyboardDebugKey))
                 EndPushToTalkAndSend();
+
+            if (allowKeyboardNewUserDebug && Input.GetKeyDown(newUserDebugKey))
+            {
+                StartNewAnonymousUserSession();
+            }
         }
 
         private void SendDebugInputFieldText()
@@ -149,6 +172,33 @@ namespace MVP.Conversation
             holdStartTime = Time.realtimeSinceStartup;
             UpdateDebugState("Recording", "Grabando... suelta para enviar.");
         }
+
+public void StartNewAnonymousUserSession()
+{
+    if (currentConversationRoutine != null)
+    {
+        StopCoroutine(currentConversationRoutine);
+        currentConversationRoutine = null;
+    }
+
+    isRunningConversation = false;
+    isHoldingToTalk = false;
+
+    if (avatarAudioSource != null)
+    {
+        avatarAudioSource.Stop();
+        avatarAudioSource.clip = null;
+    }
+
+    if (chatService is IConversationResettable resettable)
+    {
+        resettable.ResetConversationContext();
+    }
+
+    SessionManager.StartNewSession();
+    UpdateDebugState("Idle", $"Nuevo usuario activo. Session ID: {SessionManager.CurrentSessionId}");
+}
+
 
         public void EndPushToTalkAndSend()
         {
@@ -223,6 +273,12 @@ namespace MVP.Conversation
             result.assistantText = chatResult.responseText;
             result.emotion = chatResult.emotion;
             result.intentTags = chatResult.intentTags ?? new List<IntentTag>();
+            result.backendLatencyMs = chatResult.latencyMs;
+            result.backendModel = chatResult.model;
+            result.backendRagHits = chatResult.ragHits;
+            result.backendSourceTitles = chatResult.sourceTitles ?? new List<string>();
+
+
 
             emotionController?.ApplyEmotion(result.emotion, result.intentTags);
 
@@ -230,6 +286,12 @@ namespace MVP.Conversation
 
             result.timing.StopTotal();
             isRunningConversation = false;
+            
+            if (SessionManager.HasActiveSession)
+            {
+                SessionManager.RegisterTurn();
+            }
+
             LogTiming(result);
         }
 
@@ -323,6 +385,10 @@ namespace MVP.Conversation
             result.assistantText = chatResult.responseText;
             result.emotion = chatResult.emotion;
             result.intentTags = chatResult.intentTags ?? new List<IntentTag>();
+            result.backendLatencyMs = chatResult.latencyMs;
+            result.backendModel = chatResult.model;
+            result.backendRagHits = chatResult.ragHits;
+            result.backendSourceTitles = chatResult.sourceTitles ?? new List<string>();
 
             emotionController?.ApplyEmotion(result.emotion, result.intentTags);
 
@@ -330,6 +396,13 @@ namespace MVP.Conversation
 
             result.timing.StopTotal();
             isRunningConversation = false;
+
+            if (SessionManager.HasActiveSession)
+            {
+                SessionManager.RegisterTurn();
+            }
+
+
             LogTiming(result);
         }
 
@@ -450,10 +523,25 @@ namespace MVP.Conversation
                 $"Time to playback end: {result.timing.TimeToPlaybackEndSeconds:F2}s | " +
                 $"Turn coroutine complete: {result.timing.TurnCompleteSeconds:F2}s";
 
-            if (includeAssistantTextInTimingView && !string.IsNullOrWhiteSpace(result.assistantText))
-                timingText += $"\n\nAI: {result.assistantText}";
+            if (result.backendLatencyMs > 0 || !string.IsNullOrWhiteSpace(result.backendModel))
+            {
+                timingText +=
+                    $"\nBackend latency: {result.backendLatencyMs} ms | " +
+                    $"Backend model: {result.backendModel ?? "n/a"} | " +
+                    $"RAG hits: {result.backendRagHits}";
+            }
 
-            Debug.Log("[OpenAIConversationController] " + timingText.Replace("\n", " | "));
+            if (result.backendSourceTitles != null && result.backendSourceTitles.Count > 0)
+            {
+                timingText += "\nSources: " + string.Join(", ", result.backendSourceTitles);
+            }
+
+            if (includeAssistantTextInTimingView && !string.IsNullOrWhiteSpace(result.assistantText))
+            {
+                timingText += $"\n\nAI: {result.assistantText}";
+            }
+
+            Debug.Log($"[OpenAIConversationController] {timingText.Replace("\n", " | ")}");
 
             if (showTimingInDebugView && debugView != null)
             {

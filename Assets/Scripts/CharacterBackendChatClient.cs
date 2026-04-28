@@ -8,22 +8,25 @@ using UnityEngine.Networking;
 
 namespace MVP.Conversation
 {
-    public class CharacterBackendChatClient : MonoBehaviour, IChatService
+    public class CharacterBackendChatClient : MonoBehaviour, IChatService, IConversationResettable
     {
         [Header("Backend Chat API")]
         [SerializeField] private string baseUrl = "https://your-backend.example.com";
-        [SerializeField] private string chatPath = "/chat";
+        [SerializeField] private string chatPath = "chat";
+        [SerializeField] private string sessionResetPath = "session/reset";
         [SerializeField] private string bearerToken = "YOUR_BACKEND_TOKEN";
-        [SerializeField] private string characterId = "default_character";
+        [SerializeField] private string characterId = "default-character";
         [SerializeField] private string locale = "es-ES";
+        [SerializeField] private string optionalUserId = null;
 
         [Header("Debug")]
         [SerializeField] private bool logRequests = false;
         [SerializeField] private bool logResponses = false;
+        [SerializeField] private bool callResetEndpointOnNewUser = false;
 
-        private string ChatUrl => baseUrl.TrimEnd('/') + chatPath;
+        private string ChatUrl => $"{baseUrl.TrimEnd('/')}/{chatPath.TrimStart('/')}";
+        private string SessionResetUrl => $"{baseUrl.TrimEnd('/')}/{sessionResetPath.TrimStart('/')}";
 
-        // Compat: versión simple que devuelve solo texto
         public IEnumerator RequestChat(string userMessage, Action<string, string> onComplete)
         {
             ChatServiceResult richResult = null;
@@ -46,19 +49,28 @@ namespace MVP.Conversation
 
         public IEnumerator RequestChatRich(string userMessage, Action<ChatServiceResult, string> onComplete)
         {
-            var requestBody = new ChatRequestDto
+            if (!SessionManager.HasActiveSession)
+            {
+                SessionManager.StartNewSession();
+            }
+
+            var requestBody = new ClientChatRequestDto
             {
                 session_id = SessionManager.CurrentSessionId,
                 user_text = userMessage,
                 character_id = characterId,
-                metadata = new ChatRequestMetadata
+                metadata = new ClientChatMetadataRequestDto
                 {
                     locale = locale,
-                    user_id = null // si quieres pasarlo más adelante
+                    user_id = string.IsNullOrWhiteSpace(optionalUserId) ? null : optionalUserId
                 }
             };
 
-            string json = JsonConvert.SerializeObject(requestBody);
+            string json = JsonConvert.SerializeObject(requestBody, new JsonSerializerSettings
+            {
+                NullValueHandling = NullValueHandling.Ignore
+            });
+
             byte[] bodyRaw = Encoding.UTF8.GetBytes(json);
 
             using var request = new UnityWebRequest(ChatUrl, UnityWebRequest.kHttpVerbPOST);
@@ -68,7 +80,9 @@ namespace MVP.Conversation
             request.SetRequestHeader("Authorization", $"Bearer {bearerToken}");
 
             if (logRequests)
-                Debug.Log($"[CharacterBackendChatClient] POST {ChatUrl}\n{json}");
+            {
+                Debug.Log($"CharacterBackendChatClient POST {ChatUrl}\n{json}");
+            }
 
             yield return request.SendWebRequest();
 
@@ -76,28 +90,39 @@ namespace MVP.Conversation
 
             if (request.result != UnityWebRequest.Result.Success)
             {
-                onComplete?.Invoke(null, request.error + "\n" + raw);
+                onComplete?.Invoke(null, request.error ?? raw);
                 yield break;
             }
 
             if (logResponses)
-                Debug.Log($"[CharacterBackendChatClient] RESPONSE {raw}");
+            {
+                Debug.Log($"CharacterBackendChatClient RESPONSE\n{raw}");
+            }
 
-            ChatResponseDto dto;
+            ClientChatResponseDto dto;
             try
             {
-                dto = JsonConvert.DeserializeObject<ChatResponseDto>(raw);
+                dto = JsonConvert.DeserializeObject<ClientChatResponseDto>(raw);
             }
             catch (Exception e)
             {
-                onComplete?.Invoke(null, "Error parseando JSON de backend chat: " + e.Message + "\nRAW:\n" + raw);
+                onComplete?.Invoke(null, $"Error parseando JSON de backend chat: {e.Message}\n{raw}");
                 yield break;
             }
 
             if (dto == null || string.IsNullOrWhiteSpace(dto.response_text))
             {
-                onComplete?.Invoke(null, "Respuesta vacía o inválida del backend chat.\nRAW:\n" + raw);
+                onComplete?.Invoke(null, $"Respuesta vacía o inválida del backend chat.\n{raw}");
                 yield break;
+            }
+
+            if (!string.IsNullOrWhiteSpace(dto.session_id))
+            {
+                // mantenemos sincronizado el session_id por si el backend lo devuelve normalizado
+                if (SessionManager.CurrentSessionId != dto.session_id)
+                {
+                    Debug.Log($"CharacterBackendChatClient: session_id actualizado por backend: {dto.session_id}");
+                }
             }
 
             var result = new ChatServiceResult
@@ -105,16 +130,71 @@ namespace MVP.Conversation
                 responseText = dto.response_text.Trim(),
                 emotion = MapEmotion(dto.emotion),
                 intentTags = MapIntentTags(dto.intent_tags),
-                rawJson = raw
+                rawJson = raw,
+                latencyMs = dto.metadata != null ? dto.metadata.latency_ms : 0,
+                model = dto.metadata != null ? dto.metadata.model : null,
+                ragHits = dto.metadata != null ? dto.metadata.rag_hits : 0,
+                sourceTitles = dto.sources != null
+                    ? dto.sources.ConvertAll(s => s.title)
+                    : new List<string>()
             };
 
+            SessionManager.RegisterTurn();
             onComplete?.Invoke(result, null);
+        }
+
+        public void ResetConversationContext()
+        {
+            StartCoroutine(ResetConversationContextRoutine());
+        }
+
+        private IEnumerator ResetConversationContextRoutine()
+        {
+            if (!callResetEndpointOnNewUser)
+            {
+                yield break;
+            }
+
+            if (!SessionManager.HasActiveSession)
+            {
+                yield break;
+            }
+
+            var body = new
+            {
+                session_id = SessionManager.CurrentSessionId,
+                character_id = characterId
+            };
+
+            string json = JsonConvert.SerializeObject(body);
+            byte[] bodyRaw = Encoding.UTF8.GetBytes(json);
+
+            using var request = new UnityWebRequest(SessionResetUrl, UnityWebRequest.kHttpVerbPOST);
+            request.uploadHandler = new UploadHandlerRaw(bodyRaw);
+            request.downloadHandler = new DownloadHandlerBuffer();
+            request.SetRequestHeader("Content-Type", "application/json");
+            request.SetRequestHeader("Authorization", $"Bearer {bearerToken}");
+
+            if (logRequests)
+            {
+                Debug.Log($"CharacterBackendChatClient POST {SessionResetUrl}\n{json}");
+            }
+
+            yield return request.SendWebRequest();
+
+            if (request.result != UnityWebRequest.Result.Success)
+            {
+                Debug.LogWarning($"CharacterBackendChatClient reset endpoint error: {request.error}\n{request.downloadHandler.text}");
+            }
+            else if (logResponses)
+            {
+                Debug.Log($"CharacterBackendChatClient RESET RESPONSE\n{request.downloadHandler.text}");
+            }
         }
 
         private CharacterEmotion MapEmotion(string emotion)
         {
-            if (string.IsNullOrEmpty(emotion))
-                return CharacterEmotion.Neutral;
+            if (string.IsNullOrEmpty(emotion)) return CharacterEmotion.Neutral;
 
             switch (emotion.ToLowerInvariant())
             {
@@ -123,6 +203,7 @@ namespace MVP.Conversation
                 case "concerned": return CharacterEmotion.Concerned;
                 case "angry": return CharacterEmotion.Angry;
                 case "sad": return CharacterEmotion.Sad;
+                case "neutral":
                 default: return CharacterEmotion.Neutral;
             }
         }
@@ -130,77 +211,23 @@ namespace MVP.Conversation
         private List<IntentTag> MapIntentTags(List<string> tags)
         {
             var list = new List<IntentTag>();
-            if (tags == null || tags.Count == 0)
-                return list;
+            if (tags == null || tags.Count == 0) return list;
 
             foreach (var t in tags)
             {
-                if (string.IsNullOrEmpty(t))
-                    continue;
+                if (string.IsNullOrEmpty(t)) continue;
 
                 switch (t.ToLowerInvariant())
                 {
-                    case "greeting":
-                        list.Add(IntentTag.Greeting);
-                        break;
-                    case "knowledge_answer":
-                        list.Add(IntentTag.KnowledgeAnswer);
-                        break;
-                    case "fallback":
-                        list.Add(IntentTag.Fallback);
-                        break;
-                    case "out_of_scope":
-                        list.Add(IntentTag.OutOfScope);
-                        break;
-                    default:
-                        list.Add(IntentTag.Unknown);
-                        break;
+                    case "greeting": list.Add(IntentTag.Greeting); break;
+                    case "knowledge_answer": list.Add(IntentTag.KnowledgeAnswer); break;
+                    case "fallback": list.Add(IntentTag.Fallback); break;
+                    case "out_of_scope": list.Add(IntentTag.OutOfScope); break;
+                    default: list.Add(IntentTag.Unknown); break;
                 }
             }
 
             return list;
-        }
-
-        [Serializable]
-        private class ChatRequestMetadata
-        {
-            public string locale;
-            public string user_id;
-        }
-
-        [Serializable]
-        private class ChatRequestDto
-        {
-            public string session_id;
-            public string user_text;
-            public string character_id;
-            public ChatRequestMetadata metadata;
-        }
-
-        [Serializable]
-        private class SourceDto
-        {
-            public string title;
-            public float score;
-        }
-
-        [Serializable]
-        private class ResponseMetadataDto
-        {
-            public int latency_ms;
-            public string model;
-            public int rag_hits;
-        }
-
-        [Serializable]
-        private class ChatResponseDto
-        {
-            public string session_id;
-            public string response_text;
-            public string emotion;
-            public List<string> intent_tags;
-            public List<SourceDto> sources;
-            public ResponseMetadataDto metadata;
         }
     }
 }
