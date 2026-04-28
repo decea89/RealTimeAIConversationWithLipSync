@@ -57,5 +57,9 @@ namespace MVP.Conversation
         public List<IntentTag> intentTags = new List<IntentTag>();
         public string error;
         public ConversationTiming timing = new ConversationTiming();
+        public int backendLatencyMs;
+        public string backendModel;
+        public int backendRagHits;
+        public List<string> backendSourceTitles = new List<string>();
     }
 }
