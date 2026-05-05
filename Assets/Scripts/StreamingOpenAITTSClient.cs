@@ -275,7 +275,7 @@ namespace MVP.Conversation
             }
 
             if (sampleIndex > 0)
-                audioBuffer.Write(samples, sampleIndex);
+                // audioBuffer.Write(samples, sampleIndex);
 
             Interlocked.Add(ref totalBytesReceived, dataLength);
 
