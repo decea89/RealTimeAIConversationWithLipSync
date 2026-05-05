@@ -20,7 +20,30 @@ namespace MVP.Conversation
         [SerializeField] private float maxWaitForNextSegmentSeconds = 2.5f;
 
         private ITTSService innerTtsService;
+        public int MaxSegmentChars => maxSegmentChars;
+        public bool LogSegments => logSegments;
+        public float TransitionPaddingSeconds => transitionPaddingSeconds;
+        public float MaxWaitForNextSegmentSeconds => maxWaitForNextSegmentSeconds;
 
+        public void SetMaxSegmentChars(int value)
+        {
+            maxSegmentChars = Mathf.Max(20, value);
+        }
+
+        public void SetLogSegments(bool value)
+        {
+            logSegments = value;
+        }
+
+        public void SetTransitionPaddingSeconds(float value)
+        {
+            transitionPaddingSeconds = Mathf.Clamp(value, 0f, 0.25f);
+        }
+
+        public void SetMaxWaitForNextSegmentSeconds(float value)
+        {
+            maxWaitForNextSegmentSeconds = Mathf.Clamp(value, 0.1f, 10f);
+        }
         private void Awake()
         {
             if (innerTtsServiceBehaviour != null)

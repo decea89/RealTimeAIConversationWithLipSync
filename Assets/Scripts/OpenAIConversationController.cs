@@ -1,8 +1,10 @@
 using System.Collections;
 using System.Collections.Generic;
-using TMPro;
 using UnityEngine;
-using UnityEngine.UI;
+using UnityEngine.InputSystem;
+#if PLATFORM_ANDROID
+using UnityEngine.Android;
+#endif
 
 namespace MVP.Conversation
 {
@@ -14,30 +16,20 @@ namespace MVP.Conversation
         [SerializeField] private MonoBehaviour ttsServiceBehaviour;    // ITTSService o IStreamingTTSService
         [SerializeField] private MicrophoneRecorder microphoneRecorder;
         [SerializeField] private AudioSource avatarAudioSource;
-        [SerializeField] private ConversationDebugView debugView;
         [SerializeField] private AvatarEmotionController emotionController;
+        [SerializeField] private WorldSpaceDebugPanelController worldSpaceDebugPanel;
 
         [Header("Push To Talk")]
         [SerializeField] private bool useKeyboardDebugShortcut = true;
         [SerializeField] private KeyCode keyboardDebugKey = KeyCode.Space;
+        [SerializeField] private bool useXriPushToTalk = true;
+        [SerializeField] private InputActionReference pushToTalkAction;
         [SerializeField] private float minimumHoldSeconds = 0.12f;
 
-        [Header("Latency Debug")]
-        [SerializeField] private bool showTimingInDebugView = true;
-        [SerializeField] private bool includeAssistantTextInTimingView = true;
+        [Header("Debug Output")]
+        [SerializeField] private bool includeAssistantTextInMetrics = true;
+        [SerializeField] private bool includeSourcesInBackendInfo = true;
 
-        [Header("Optional UI")]
-        [SerializeField] private TMP_InputField debugInputField;
-        [SerializeField] private Button debugSendButton;
-        [SerializeField] private bool sendInputFieldOnEnter = true;
-        [SerializeField] private bool clearInputFieldAfterSend = false;
-
-
-        [Header("Editor Debug")]
-        [SerializeField] private KeyCode playDebugCapturedClipKey = KeyCode.P;
-        [SerializeField] private StreamingOpenAITTSClient streamingDebugClient;
-        [SerializeField] private bool allowKeyboardNewUserDebug = true;
-        [SerializeField] private KeyCode newUserDebugKey = KeyCode.N;
         private IChatService chatService;
         private ISTTService sttService;
         private ITTSService ttsService;
@@ -47,6 +39,9 @@ namespace MVP.Conversation
         private bool isHoldingToTalk;
         private float holdStartTime;
         private Coroutine currentConversationRoutine;
+
+        public bool IsHoldingToTalk => isHoldingToTalk;
+        public bool IsRunningConversation => isRunningConversation;
 
         private void Awake()
         {
@@ -76,73 +71,72 @@ namespace MVP.Conversation
 
             if (microphoneRecorder == null)
                 Debug.LogWarning("[OpenAIConversationController] MicrophoneRecorder is not assigned. Text mode can still work.");
-
-            if (debugSendButton != null)
-                debugSendButton.onClick.AddListener(SendDebugInputFieldText);
         }
 
-        /// <summary>
-        /// Start is called on the frame when a script is enabled just before
-        /// any of the Update methods is called the first time.
-        /// </summary>
-        void Start()
+        private void OnEnable()
         {
+            if (pushToTalkAction != null && pushToTalkAction.action != null)
+                pushToTalkAction.action.Enable();
+        }
+
+        private void OnDisable()
+        {
+            if (pushToTalkAction != null && pushToTalkAction.action != null)
+                pushToTalkAction.action.Disable();
+        }
+
+        private void Start()
+        {
+
+            #if PLATFORM_ANDROID
+                    if (!Permission.HasUserAuthorizedPermission(Permission.Microphone))
+                    {
+                        Permission.RequestUserPermission(Permission.Microphone);
+                    }
+            #endif
             if (!SessionManager.HasActiveSession)
             {
                 SessionManager.StartNewSession();
-                UpdateDebugState("Idle", $"Sesión inicial creada: {SessionManager.CurrentSessionId}");
+                UpdatePanelState("Idle");
+                UpdatePanelBackendInfo($"Session initialized: {SessionManager.CurrentSessionId}");
+            }
+            else
+            {
+                UpdatePanelState("Idle");
             }
         }
 
         private void Update()
         {
-            if (Input.GetKeyDown(playDebugCapturedClipKey) && streamingDebugClient != null)
-            {
-                streamingDebugClient.PlayDebugCapturedClip(avatarAudioSource);
-            }
-
-
-            if (sendInputFieldOnEnter &&
-                debugInputField != null &&
-                debugInputField.isFocused &&
-                !isRunningConversation &&
-                (Input.GetKeyDown(KeyCode.Return) || Input.GetKeyDown(KeyCode.KeypadEnter)))
-            {
-                SendDebugInputFieldText();
-                return;
-            }
-
-
-            if (!useKeyboardDebugShortcut || microphoneRecorder == null)
+            if (microphoneRecorder == null)
                 return;
 
-            if (Input.GetKeyDown(keyboardDebugKey))
+            bool pttDown = false;
+            bool pttUp = false;
+
+#if UNITY_EDITOR
+            if (useKeyboardDebugShortcut && Input.GetKeyDown(keyboardDebugKey))
+                pttDown = true;
+
+            if (useKeyboardDebugShortcut && Input.GetKeyUp(keyboardDebugKey))
+                pttUp = true;
+#endif
+
+            if (useXriPushToTalk && pushToTalkAction != null && pushToTalkAction.action != null)
+            {
+                if (pushToTalkAction.action.WasPressedThisFrame())
+                    pttDown = true;
+
+                if (pushToTalkAction.action.WasReleasedThisFrame())
+                    pttUp = true;
+            }
+
+            if (pttDown)
                 BeginPushToTalk();
 
-            if (Input.GetKeyUp(keyboardDebugKey))
+            if (pttUp)
                 EndPushToTalkAndSend();
-
-            if (allowKeyboardNewUserDebug && Input.GetKeyDown(newUserDebugKey))
-            {
-                StartNewAnonymousUserSession();
-            }
         }
-
-        private void SendDebugInputFieldText()
-        {
-            if (debugInputField == null)
-                return;
-
-            string text = debugInputField.text;
-            if (string.IsNullOrWhiteSpace(text))
-                return;
-
-            StartTextConversation(text);
-
-            if (clearInputFieldAfterSend)
-                debugInputField.text = string.Empty;
-        }
-
 
         public void StartTextConversation(string userText)
         {
@@ -164,41 +158,15 @@ namespace MVP.Conversation
 
             if (!microphoneRecorder.IsRecording)
             {
-                UpdateDebugState("Error", "No se pudo iniciar la grabación del micrófono.");
+                UpdatePanelState("Error");
+                UpdatePanelBackendInfo("No se pudo iniciar la grabación del micrófono.");
                 return;
             }
 
             isHoldingToTalk = true;
             holdStartTime = Time.realtimeSinceStartup;
-            UpdateDebugState("Recording", "Grabando... suelta para enviar.");
+            UpdatePanelState("Recording");
         }
-
-public void StartNewAnonymousUserSession()
-{
-    if (currentConversationRoutine != null)
-    {
-        StopCoroutine(currentConversationRoutine);
-        currentConversationRoutine = null;
-    }
-
-    isRunningConversation = false;
-    isHoldingToTalk = false;
-
-    if (avatarAudioSource != null)
-    {
-        avatarAudioSource.Stop();
-        avatarAudioSource.clip = null;
-    }
-
-    if (chatService is IConversationResettable resettable)
-    {
-        resettable.ResetConversationContext();
-    }
-
-    SessionManager.StartNewSession();
-    UpdateDebugState("Idle", $"Nuevo usuario activo. Session ID: {SessionManager.CurrentSessionId}");
-}
-
 
         public void EndPushToTalkAndSend()
         {
@@ -213,14 +181,16 @@ public void StartNewAnonymousUserSession()
                 if (microphoneRecorder.IsRecording)
                     microphoneRecorder.StopRecording();
 
-                UpdateDebugState("Idle", "Pulsa y mantén un poco más para grabar.");
+                UpdatePanelState("Idle");
+                UpdatePanelBackendInfo("Pulsa y mantén un poco más para grabar.");
                 return;
             }
 
             AudioClip clip = microphoneRecorder.StopRecording();
             if (clip == null)
             {
-                UpdateDebugState("Error", "No se pudo obtener un AudioClip válido del micrófono.");
+                UpdatePanelState("Error");
+                UpdatePanelBackendInfo("No se pudo obtener un AudioClip válido del micrófono.");
                 return;
             }
 
@@ -228,6 +198,35 @@ public void StartNewAnonymousUserSession()
                 StopCoroutine(currentConversationRoutine);
 
             currentConversationRoutine = StartCoroutine(RunVoiceConversationFromClip(clip));
+        }
+
+        public void StartNewAnonymousUserSession()
+        {
+            if (currentConversationRoutine != null)
+            {
+                StopCoroutine(currentConversationRoutine);
+                currentConversationRoutine = null;
+            }
+
+            isRunningConversation = false;
+            isHoldingToTalk = false;
+
+            if (avatarAudioSource != null)
+            {
+                avatarAudioSource.Stop();
+                avatarAudioSource.clip = null;
+            }
+
+            if (chatService is IConversationResettable resettable)
+                resettable.ResetConversationContext();
+
+            SessionManager.StartNewSession();
+
+            UpdatePanelState("Idle");
+            worldSpaceDebugPanel?.SetUserTranscript("-");
+            worldSpaceDebugPanel?.SetAssistantTranscript("-");
+            worldSpaceDebugPanel?.SetMetrics("-");
+            UpdatePanelBackendInfo($"Nuevo usuario activo. Session ID: {SessionManager.CurrentSessionId}");
         }
 
         private IEnumerator RunTextConversation(string userText)
@@ -238,9 +237,11 @@ public void StartNewAnonymousUserSession()
             {
                 userText = userText
             };
+
             result.timing.StartTotal();
 
-            UpdateDebugState("Chat", "Procesando entrada de texto...");
+            UpdatePanelState("Chat");
+            worldSpaceDebugPanel?.SetUserTranscript(userText);
             result.timing.StartChat();
 
             ChatServiceResult chatResult = null;
@@ -264,7 +265,8 @@ public void StartNewAnonymousUserSession()
             if (!string.IsNullOrEmpty(chatError) || chatResult == null || string.IsNullOrWhiteSpace(chatResult.responseText))
             {
                 result.error = string.IsNullOrEmpty(chatError) ? "Respuesta de chat vacía." : chatError;
-                UpdateDebugState("Error", result.error);
+                UpdatePanelState("Error");
+                UpdatePanelBackendInfo(result.error);
                 isRunningConversation = false;
                 LogTiming(result);
                 yield break;
@@ -278,21 +280,19 @@ public void StartNewAnonymousUserSession()
             result.backendRagHits = chatResult.ragHits;
             result.backendSourceTitles = chatResult.sourceTitles ?? new List<string>();
 
-
-
+            worldSpaceDebugPanel?.SetAssistantTranscript(result.assistantText);
             emotionController?.ApplyEmotion(result.emotion, result.intentTags);
 
             yield return PlayAssistantReplyWithTts(result);
 
             result.timing.StopTotal();
             isRunningConversation = false;
-            
+
             if (SessionManager.HasActiveSession)
-            {
                 SessionManager.RegisterTurn();
-            }
 
             LogTiming(result);
+            UpdatePanelState("Idle");
         }
 
         private IEnumerator RunVoiceConversationFromClip(AudioClip clip)
@@ -305,12 +305,13 @@ public void StartNewAnonymousUserSession()
             if (clip == null)
             {
                 result.error = "No se grabó audio desde el micrófono.";
-                UpdateDebugState("Error", result.error);
+                UpdatePanelState("Error");
+                UpdatePanelBackendInfo(result.error);
                 isRunningConversation = false;
                 yield break;
             }
 
-            UpdateDebugState("STT", "Transcribiendo audio del usuario...");
+            UpdatePanelState("STT");
             result.timing.StartStt();
 
             AudioClip trimmedClip = AudioTrimmingUtility.TrimSilence(
@@ -321,6 +322,7 @@ public void StartNewAnonymousUserSession()
             );
 
             AudioClip clipToSend = trimmedClip != null ? trimmedClip : clip;
+            // AudioClip clipToSend = clip;
             byte[] wavBytes = WavUtility.FromAudioClip(clipToSend);
 
             string userText = null;
@@ -344,15 +346,17 @@ public void StartNewAnonymousUserSession()
             if (!string.IsNullOrEmpty(sttError) || string.IsNullOrWhiteSpace(userText))
             {
                 result.error = string.IsNullOrEmpty(sttError) ? "La transcripción de STT está vacía." : sttError;
-                UpdateDebugState("Error", result.error);
+                UpdatePanelState("Error");
+                UpdatePanelBackendInfo(result.error);
                 isRunningConversation = false;
                 LogTiming(result);
                 yield break;
             }
 
             result.userText = userText;
+            worldSpaceDebugPanel?.SetUserTranscript(userText);
 
-            UpdateDebugState("Chat", "Consultando servicio de chat...");
+            UpdatePanelState("Chat");
             result.timing.StartChat();
 
             ChatServiceResult chatResult = null;
@@ -376,7 +380,8 @@ public void StartNewAnonymousUserSession()
             if (!string.IsNullOrEmpty(chatError) || chatResult == null || string.IsNullOrWhiteSpace(chatResult.responseText))
             {
                 result.error = string.IsNullOrEmpty(chatError) ? "Respuesta de chat vacía." : chatError;
-                UpdateDebugState("Error", result.error);
+                UpdatePanelState("Error");
+                UpdatePanelBackendInfo(result.error);
                 isRunningConversation = false;
                 LogTiming(result);
                 yield break;
@@ -390,6 +395,7 @@ public void StartNewAnonymousUserSession()
             result.backendRagHits = chatResult.ragHits;
             result.backendSourceTitles = chatResult.sourceTitles ?? new List<string>();
 
+            worldSpaceDebugPanel?.SetAssistantTranscript(result.assistantText);
             emotionController?.ApplyEmotion(result.emotion, result.intentTags);
 
             yield return PlayAssistantReplyWithTts(result);
@@ -398,12 +404,10 @@ public void StartNewAnonymousUserSession()
             isRunningConversation = false;
 
             if (SessionManager.HasActiveSession)
-            {
                 SessionManager.RegisterTurn();
-            }
-
 
             LogTiming(result);
+            UpdatePanelState("Idle");
         }
 
         private IEnumerator PlayAssistantReplyWithTts(ConversationResult result)
@@ -411,13 +415,14 @@ public void StartNewAnonymousUserSession()
             if (string.IsNullOrWhiteSpace(result.assistantText))
             {
                 result.error = "assistantText está vacío, no hay nada que sintetizar.";
-                UpdateDebugState("Error", result.error);
+                UpdatePanelState("Error");
+                UpdatePanelBackendInfo(result.error);
                 yield break;
             }
 
             if (streamingTtsService != null)
             {
-                UpdateDebugState("TTS", "Generando audio streaming...");
+                UpdatePanelState("TTS");
                 result.timing.StartTts();
 
                 string streamingError = null;
@@ -434,7 +439,7 @@ public void StartNewAnonymousUserSession()
                         playbackMarked = true;
                         result.timing.StopTts();
                         result.timing.MarkPlaybackStart();
-                        UpdateDebugState("Speaking", "Reproduciendo audio streaming...");
+                        UpdatePanelState("Speaking");
                     },
                     onError: err =>
                     {
@@ -448,7 +453,8 @@ public void StartNewAnonymousUserSession()
                 if (!string.IsNullOrEmpty(streamingError))
                 {
                     result.error = streamingError;
-                    UpdateDebugState("Error", streamingError);
+                    UpdatePanelState("Error");
+                    UpdatePanelBackendInfo(streamingError);
                     yield break;
                 }
 
@@ -467,11 +473,12 @@ public void StartNewAnonymousUserSession()
             if (ttsService == null)
             {
                 result.error = "TTS service not configured.";
-                UpdateDebugState("Error", result.error);
+                UpdatePanelState("Error");
+                UpdatePanelBackendInfo(result.error);
                 yield break;
             }
 
-            UpdateDebugState("TTS", "Generando audio de la respuesta...");
+            UpdatePanelState("TTS");
             result.timing.StartTts();
 
             AudioClip ttsClip = null;
@@ -488,26 +495,26 @@ public void StartNewAnonymousUserSession()
             if (!string.IsNullOrEmpty(ttsError))
             {
                 result.error = ttsError;
-                UpdateDebugState("Error", ttsError);
+                UpdatePanelState("Error");
+                UpdatePanelBackendInfo(ttsError);
                 yield break;
             }
 
             if (ttsClip == null)
             {
                 result.error = "TTS devolvió un clip nulo.";
-                UpdateDebugState("Error", result.error);
+                UpdatePanelState("Error");
+                UpdatePanelBackendInfo(result.error);
                 yield break;
             }
 
-            UpdateDebugState("Speaking", "Reproduciendo audio en el avatar...");
+            UpdatePanelState("Speaking");
             avatarAudioSource.Stop();
             avatarAudioSource.clip = ttsClip;
             avatarAudioSource.Play();
 
             result.timing.MarkPlaybackStart();
-
             yield return new WaitForSeconds(ttsClip.length);
-
             result.timing.MarkPlaybackEnd();
         }
 
@@ -516,47 +523,60 @@ public void StartNewAnonymousUserSession()
             if (result == null)
                 return;
 
-            string timingText =
+            string metricsText =
                 $"STT: {result.timing.SttSeconds:F2}s | Chat: {result.timing.ChatSeconds:F2}s | TTS: {result.timing.TtsSeconds:F2}s\n" +
                 $"Time to first audio: {result.timing.TimeToFirstAudioSeconds:F2}s | " +
                 $"Playback duration: {result.timing.PlaybackDurationSeconds:F2}s | " +
                 $"Time to playback end: {result.timing.TimeToPlaybackEndSeconds:F2}s | " +
                 $"Turn coroutine complete: {result.timing.TurnCompleteSeconds:F2}s";
 
-            if (result.backendLatencyMs > 0 || !string.IsNullOrWhiteSpace(result.backendModel))
-            {
-                timingText +=
-                    $"\nBackend latency: {result.backendLatencyMs} ms | " +
-                    $"Backend model: {result.backendModel ?? "n/a"} | " +
-                    $"RAG hits: {result.backendRagHits}";
-            }
+            if (includeAssistantTextInMetrics && !string.IsNullOrWhiteSpace(result.assistantText))
+                metricsText += $"\n\nAI: {result.assistantText}";
 
-            if (result.backendSourceTitles != null && result.backendSourceTitles.Count > 0)
-            {
-                timingText += "\nSources: " + string.Join(", ", result.backendSourceTitles);
-            }
+            string backendInfo = BuildBackendInfo(result);
 
-            if (includeAssistantTextInTimingView && !string.IsNullOrWhiteSpace(result.assistantText))
-            {
-                timingText += $"\n\nAI: {result.assistantText}";
-            }
+            Debug.Log($"[OpenAIConversationController] {metricsText.Replace("\n", " | ")}");
 
-            Debug.Log($"[OpenAIConversationController] {timingText.Replace("\n", " | ")}");
-
-            if (showTimingInDebugView && debugView != null)
-            {
-                debugView.SetState("Idle");
-                debugView.SetMessage(timingText);
-            }
+            worldSpaceDebugPanel?.SetMetrics(metricsText);
+            worldSpaceDebugPanel?.SetBackendInfo(backendInfo);
         }
 
-        private void UpdateDebugState(string state, string message)
+        private string BuildBackendInfo(ConversationResult result)
         {
-            if (debugView != null)
+            var lines = new List<string>();
+
+            if (result.backendLatencyMs > 0 || !string.IsNullOrWhiteSpace(result.backendModel))
             {
-                debugView.SetState(state);
-                debugView.SetMessage(message);
+                lines.Add(
+                    $"Backend latency: {result.backendLatencyMs} ms | " +
+                    $"Backend model: {result.backendModel ?? "n/a"} | " +
+                    $"RAG hits: {result.backendRagHits}");
             }
+
+            if (includeSourcesInBackendInfo &&
+                result.backendSourceTitles != null &&
+                result.backendSourceTitles.Count > 0)
+            {
+                lines.Add("Sources: " + string.Join(", ", result.backendSourceTitles));
+            }
+
+            if (!string.IsNullOrWhiteSpace(result.error))
+            {
+                lines.Add("Error: " + result.error);
+            }
+
+            return lines.Count > 0 ? string.Join("\n", lines) : "-";
+        }
+
+        private void UpdatePanelState(string state)
+        {
+            worldSpaceDebugPanel?.SetState(state);
+        }
+
+        private void UpdatePanelBackendInfo(string message)
+        {
+            if (!string.IsNullOrWhiteSpace(message))
+                worldSpaceDebugPanel?.SetBackendInfo(message);
         }
     }
 }
