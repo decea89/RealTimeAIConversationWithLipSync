@@ -1,3 +1,6 @@
+// WorldSpaceDebugPanelController.cs
+using System;
+using System.Collections.Generic;
 using System.Text;
 using TMPro;
 using UnityEngine;
@@ -51,15 +54,24 @@ namespace MVP.Conversation
 
         [Header("Optional")]
         [SerializeField] private bool captureUnityLogs = true;
-        [SerializeField] private int maxLogLines = 8;
+        [SerializeField] private int maxLogLines = 12;
+        [SerializeField] private bool includeControllerHeartbeat = true;
 
         private readonly StringBuilder runtimeLogs = new StringBuilder();
+        private readonly Queue<string> localLogQueue = new Queue<string>();
 
         private string lastKnownState = "Idle";
         private string lastUserTranscript = "-";
         private string lastAssistantTranscript = "-";
         private string lastMetrics = "-";
         private string lastBackendInfo = "-";
+        private string lastTelemetrySummary = "-";
+
+        private bool previousHoldingToTalk;
+        private bool previousRunningConversation;
+        private bool previousAssistantSpeaking;
+        private bool previousAudioPlaying;
+        private int previousTurnId = -1;
 
         private void Awake()
         {
@@ -71,6 +83,8 @@ namespace MVP.Conversation
         {
             if (captureUnityLogs)
                 Application.logMessageReceived += OnUnityLogReceived;
+
+            SnapshotControllerFlags();
         }
 
         private void OnDisable()
@@ -85,6 +99,8 @@ namespace MVP.Conversation
         {
             RefreshSessionInfo();
             RefreshRuntimeValues();
+            RefreshTelemetrySummary();
+            PollControllerTelemetry();
         }
 
         private void WireUI()
@@ -192,7 +208,7 @@ namespace MVP.Conversation
             lastKnownState = string.IsNullOrWhiteSpace(value) ? "-" : value;
 
             if (stateText != null)
-                stateText.text = $"State: {lastKnownState}";
+                stateText.text = BuildStateText();
         }
 
         public void SetUserTranscript(string value)
@@ -212,7 +228,7 @@ namespace MVP.Conversation
             lastMetrics = string.IsNullOrWhiteSpace(value) ? "-" : value;
 
             if (metricsText != null)
-                metricsText.text = lastMetrics;
+                metricsText.text = BuildMetricsText();
         }
 
         public void SetBackendInfo(string value)
@@ -221,18 +237,24 @@ namespace MVP.Conversation
             RefreshBackendText();
         }
 
+        public void AppendTelemetryEvent(string message)
+        {
+            AppendLocalLog($"[TEL] {message}");
+        }
+
         private void RefreshAll()
         {
             RefreshSessionInfo();
             RefreshTranscriptTexts();
             RefreshBackendText();
             RefreshRuntimeValues();
+            RefreshTelemetrySummary();
 
             if (stateText != null)
-                stateText.text = $"State: {lastKnownState}";
+                stateText.text = BuildStateText();
 
             if (metricsText != null)
-                metricsText.text = lastMetrics;
+                metricsText.text = BuildMetricsText();
 
             if (lipSyncToggle != null && lipSyncBehaviour != null)
                 lipSyncToggle.SetIsOnWithoutNotify(lipSyncBehaviour.enabled);
@@ -294,9 +316,88 @@ namespace MVP.Conversation
             }
 
             if (logSegmentsToggle != null)
-            {
                 logSegmentsToggle.SetIsOnWithoutNotify(segmentedTtsClient.LogSegments);
+        }
+
+        private void RefreshTelemetrySummary()
+        {
+            if (conversationController == null)
+            {
+                lastTelemetrySummary = "Controller: n/a";
+                return;
             }
+
+            bool audioPlaying = avatarAudioSource != null && avatarAudioSource.isPlaying;
+            float audioTime = (avatarAudioSource != null && avatarAudioSource.clip != null) ? avatarAudioSource.time : 0f;
+            float clipLength = (avatarAudioSource != null && avatarAudioSource.clip != null) ? avatarAudioSource.clip.length : 0f;
+
+            lastTelemetrySummary =
+                $"TurnId: {conversationController.ActiveTurnId} | " +
+                $"Running: {conversationController.IsRunningConversation} | " +
+                $"Holding: {conversationController.IsHoldingToTalk} | " +
+                $"Speaking: {conversationController.IsAssistantSpeaking} | " +
+                $"AudioPlaying: {audioPlaying} | " +
+                $"Audio: {audioTime:0.00}/{clipLength:0.00}";
+        }
+
+        private void PollControllerTelemetry()
+        {
+            if (!includeControllerHeartbeat || conversationController == null)
+                return;
+
+            bool holding = conversationController.IsHoldingToTalk;
+            bool running = conversationController.IsRunningConversation;
+            bool speaking = conversationController.IsAssistantSpeaking;
+            int turnId = conversationController.ActiveTurnId;
+            bool audioPlaying = avatarAudioSource != null && avatarAudioSource.isPlaying;
+
+            if (turnId != previousTurnId)
+            {
+                AppendLocalLog($"[CTRL] ActiveTurnId -> {turnId}");
+                previousTurnId = turnId;
+            }
+
+            if (holding != previousHoldingToTalk)
+            {
+                AppendLocalLog($"[CTRL] HoldingToTalk -> {holding}");
+                previousHoldingToTalk = holding;
+            }
+
+            if (running != previousRunningConversation)
+            {
+                AppendLocalLog($"[CTRL] RunningConversation -> {running}");
+                previousRunningConversation = running;
+            }
+
+            if (speaking != previousAssistantSpeaking)
+            {
+                AppendLocalLog($"[CTRL] AssistantSpeaking -> {speaking}");
+                previousAssistantSpeaking = speaking;
+            }
+
+            if (audioPlaying != previousAudioPlaying)
+            {
+                AppendLocalLog($"[AUDIO] AvatarAudioSource.isPlaying -> {audioPlaying}");
+                previousAudioPlaying = audioPlaying;
+            }
+
+            if (stateText != null)
+                stateText.text = BuildStateText();
+
+            if (metricsText != null)
+                metricsText.text = BuildMetricsText();
+        }
+
+        private void SnapshotControllerFlags()
+        {
+            if (conversationController == null)
+                return;
+
+            previousHoldingToTalk = conversationController.IsHoldingToTalk;
+            previousRunningConversation = conversationController.IsRunningConversation;
+            previousAssistantSpeaking = conversationController.IsAssistantSpeaking;
+            previousTurnId = conversationController.ActiveTurnId;
+            previousAudioPlaying = avatarAudioSource != null && avatarAudioSource.isPlaying;
         }
 
         private void RefreshTranscriptTexts()
@@ -320,6 +421,18 @@ namespace MVP.Conversation
 
             bool showBackend = showBackendInfoToggle == null || showBackendInfoToggle.isOn;
             backendText.text = showBackend ? lastBackendInfo : "Backend info hidden";
+        }
+
+        private string BuildStateText()
+        {
+            return $"State: {lastKnownState}\n{lastTelemetrySummary}";
+        }
+
+        private string BuildMetricsText()
+        {
+            return string.IsNullOrWhiteSpace(lastMetrics) || lastMetrics == "-"
+                ? $"-\n\nTelemetry:\n{lastTelemetrySummary}"
+                : $"{lastMetrics}\n\nTelemetry:\n{lastTelemetrySummary}";
         }
 
         private void OnLipSyncToggleChanged(bool isOn)
@@ -364,6 +477,7 @@ namespace MVP.Conversation
 
             segmentedTtsClient.SetTransitionPaddingSeconds(value);
             UpdateSliderLabel(transitionPaddingValueText, value, "0.000");
+            AppendLocalLog($"Transition padding -> {value:0.000}");
         }
 
         private void OnMaxWaitNextSegmentSliderChanged(float value)
@@ -373,6 +487,7 @@ namespace MVP.Conversation
 
             segmentedTtsClient.SetMaxWaitForNextSegmentSeconds(value);
             UpdateSliderLabel(maxWaitNextSegmentValueText, value, "0.00");
+            AppendLocalLog($"Max wait next segment -> {value:0.00}");
         }
 
         private void OnMaxSegmentCharsSliderChanged(float value)
@@ -383,6 +498,7 @@ namespace MVP.Conversation
             int intValue = Mathf.RoundToInt(value);
             segmentedTtsClient.SetMaxSegmentChars(intValue);
             UpdateSliderLabel(maxSegmentCharsValueText, intValue, "0");
+            AppendLocalLog($"Max segment chars -> {intValue}");
         }
 
         private void OnNewUserClicked()
@@ -405,14 +521,16 @@ namespace MVP.Conversation
             RefreshTranscriptTexts();
 
             if (metricsText != null)
-                metricsText.text = "-";
+                metricsText.text = BuildMetricsText();
 
             RefreshBackendText();
+            AppendLocalLog("Transcript and metrics cleared");
         }
 
         private void OnClearLogsClicked()
         {
             runtimeLogs.Clear();
+            localLogQueue.Clear();
 
             if (logText != null)
                 logText.text = string.Empty;
@@ -436,24 +554,15 @@ namespace MVP.Conversation
             if (logText == null)
                 return;
 
-            string existing = runtimeLogs.ToString();
-            string[] lines = string.IsNullOrWhiteSpace(existing)
-                ? new string[0]
-                : existing.Split('\n');
+            string timestamped = $"{DateTime.Now:HH:mm:ss} {message}";
+            localLogQueue.Enqueue(timestamped);
 
-            var sb = new StringBuilder();
-            int start = Mathf.Max(0, lines.Length - maxLogLines + 1);
-
-            for (int i = start; i < lines.Length; i++)
-            {
-                if (!string.IsNullOrWhiteSpace(lines[i]))
-                    sb.AppendLine(lines[i]);
-            }
-
-            sb.AppendLine(message);
+            while (localLogQueue.Count > Mathf.Max(1, maxLogLines))
+                localLogQueue.Dequeue();
 
             runtimeLogs.Clear();
-            runtimeLogs.Append(sb.ToString());
+            foreach (string line in localLogQueue)
+                runtimeLogs.AppendLine(line);
 
             logText.text = runtimeLogs.ToString();
         }

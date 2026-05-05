@@ -1,3 +1,4 @@
+// SegmentedBufferedTTSClient.cs
 using System;
 using System.Collections;
 using System.Collections.Generic;
@@ -6,7 +7,7 @@ using UnityEngine;
 
 namespace MVP.Conversation
 {
-    public class SegmentedBufferedTTSClient : MonoBehaviour, ITTSService, IStreamingTTSService
+    public class SegmentedBufferedTTSClient : MonoBehaviour, ITTSService, IStreamingTTSService, IInterruptibleTTSService
     {
         [Header("Dependencies")]
         [SerializeField] private MonoBehaviour innerTtsServiceBehaviour;
@@ -20,6 +21,9 @@ namespace MVP.Conversation
         [SerializeField] private float maxWaitForNextSegmentSeconds = 2.5f;
 
         private ITTSService innerTtsService;
+        private int playbackGeneration;
+        private AudioSource activeAudioSource;
+
         public int MaxSegmentChars => maxSegmentChars;
         public bool LogSegments => logSegments;
         public float TransitionPaddingSeconds => transitionPaddingSeconds;
@@ -44,6 +48,7 @@ namespace MVP.Conversation
         {
             maxWaitForNextSegmentSeconds = Mathf.Clamp(value, 0.1f, 10f);
         }
+
         private void Awake()
         {
             if (innerTtsServiceBehaviour != null)
@@ -51,6 +56,19 @@ namespace MVP.Conversation
 
             if (innerTtsService == null)
                 Debug.LogError("[SegmentedBufferedTTSClient] innerTtsServiceBehaviour no implementa ITTSService.");
+        }
+
+        public void InterruptPlayback()
+        {
+            playbackGeneration++;
+
+            if (activeAudioSource != null)
+            {
+                activeAudioSource.Stop();
+                activeAudioSource.clip = null;
+            }
+
+            Debug.Log($"[SegmentedBufferedTTSClient] InterruptPlayback generation={playbackGeneration}");
         }
 
         public IEnumerator RequestSpeech(string text, Action<AudioClip, string> onComplete)
@@ -84,6 +102,9 @@ namespace MVP.Conversation
                 yield break;
             }
 
+            int requestGeneration = ++playbackGeneration;
+            activeAudioSource = targetAudioSource;
+
             List<string> segments = SplitIntoSegments(text, maxSegmentChars);
             if (segments == null || segments.Count == 0)
             {
@@ -93,7 +114,7 @@ namespace MVP.Conversation
 
             if (logSegments)
             {
-                Debug.Log($"[SegmentedBufferedTTSClient] Segmentos={segments.Count}");
+                Debug.Log($"[SegmentedBufferedTTSClient] Segmentos={segments.Count} generation={requestGeneration}");
                 for (int i = 0; i < segments.Count; i++)
                     Debug.Log($"[SegmentedBufferedTTSClient] [{i + 1}/{segments.Count}] {segments[i]}");
             }
@@ -101,7 +122,10 @@ namespace MVP.Conversation
             bool playbackStarted = false;
 
             SegmentRequest current = new SegmentRequest(0, segments[0]);
-            yield return StartCoroutine(RequestSegmentCoroutine(current));
+            yield return StartCoroutine(RequestSegmentCoroutine(current, requestGeneration));
+
+            if (requestGeneration != playbackGeneration)
+                yield break;
 
             if (!string.IsNullOrEmpty(current.error))
             {
@@ -116,10 +140,12 @@ namespace MVP.Conversation
             }
 
             SegmentRequest next = null;
-            Coroutine nextRequestCoroutine = null;
 
             for (int i = 0; i < segments.Count; i++)
             {
+                if (requestGeneration != playbackGeneration)
+                    yield break;
+
                 current.index = i;
                 current.text = segments[i];
 
@@ -132,12 +158,26 @@ namespace MVP.Conversation
                 if (i + 1 < segments.Count)
                 {
                     next = new SegmentRequest(i + 1, segments[i + 1]);
-                    nextRequestCoroutine = StartCoroutine(RequestSegmentCoroutine(next));
+                    yield return StartCoroutine(RequestSegmentCoroutine(next, requestGeneration));
+
+                    if (requestGeneration != playbackGeneration)
+                        yield break;
+
+                    if (!string.IsNullOrEmpty(next.error))
+                    {
+                        onError?.Invoke(next.error);
+                        yield break;
+                    }
+
+                    if (next.clip == null)
+                    {
+                        onError?.Invoke($"SegmentedBufferedTTSClient: clip nulo en segmento {next.index + 1}.");
+                        yield break;
+                    }
                 }
                 else
                 {
                     next = null;
-                    nextRequestCoroutine = null;
                 }
 
                 targetAudioSource.Stop();
@@ -154,47 +194,29 @@ namespace MVP.Conversation
                 float playEnd = Time.time + waitTime;
 
                 while (Time.time < playEnd)
-                    yield return null;
-
-                if (next != null)
                 {
-                    float waitDeadline = Time.time + maxWaitForNextSegmentSeconds;
-
-                    while (!next.isDone && Time.time < waitDeadline)
-                        yield return null;
-
-                    if (!next.isDone)
-                    {
-                        if (nextRequestCoroutine != null)
-                            StopCoroutine(nextRequestCoroutine);
-
-                        onError?.Invoke($"SegmentedBufferedTTSClient: timeout esperando el segmento {next.index + 1}.");
+                    if (requestGeneration != playbackGeneration)
                         yield break;
-                    }
 
-                    if (!string.IsNullOrEmpty(next.error))
-                    {
-                        onError?.Invoke(next.error);
-                        yield break;
-                    }
-
-                    if (next.clip == null)
-                    {
-                        onError?.Invoke($"SegmentedBufferedTTSClient: clip nulo en segmento {next.index + 1}.");
-                        yield break;
-                    }
+                    yield return null;
                 }
 
                 current = next;
             }
 
-            while (targetAudioSource.isPlaying)
-                yield return null;
+            while (targetAudioSource != null && targetAudioSource.isPlaying)
+            {
+                if (requestGeneration != playbackGeneration)
+                    yield break;
 
-            onCompleted?.Invoke();
+                yield return null;
+            }
+
+            if (requestGeneration == playbackGeneration)
+                onCompleted?.Invoke();
         }
 
-        private IEnumerator RequestSegmentCoroutine(SegmentRequest request)
+        private IEnumerator RequestSegmentCoroutine(SegmentRequest request, int requestGeneration)
         {
             if (request == null)
                 yield break;
@@ -207,6 +229,9 @@ namespace MVP.Conversation
                 segmentClip = clip;
                 segmentError = err;
             });
+
+            if (requestGeneration != playbackGeneration)
+                yield break;
 
             request.clip = segmentClip;
             request.error = segmentError;
