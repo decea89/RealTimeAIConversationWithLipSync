@@ -1,3 +1,4 @@
+// ConversationContracts.cs
 using System;
 using System.Collections;
 using UnityEngine;
@@ -28,6 +29,11 @@ namespace MVP.Conversation
             Action onPlaybackStarted,
             Action<string> onError,
             Action onCompleted);
+    }
+
+    public interface IInterruptibleTTSService
+    {
+        void InterruptPlayback();
     }
 
     public interface IConversationResettable

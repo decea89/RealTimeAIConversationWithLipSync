@@ -1,3 +1,4 @@
+// OpenAIConversationController.cs
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
@@ -11,9 +12,9 @@ namespace MVP.Conversation
     public class OpenAIConversationController : MonoBehaviour
     {
         [Header("Dependencies")]
-        [SerializeField] private MonoBehaviour chatServiceBehaviour;   // IChatService
-        [SerializeField] private MonoBehaviour sttServiceBehaviour;    // ISTTService
-        [SerializeField] private MonoBehaviour ttsServiceBehaviour;    // ITTSService o IStreamingTTSService
+        [SerializeField] private MonoBehaviour chatServiceBehaviour;
+        [SerializeField] private MonoBehaviour sttServiceBehaviour;
+        [SerializeField] private MonoBehaviour ttsServiceBehaviour;
         [SerializeField] private MicrophoneRecorder microphoneRecorder;
         [SerializeField] private AudioSource avatarAudioSource;
         [SerializeField] private AvatarEmotionController emotionController;
@@ -25,6 +26,7 @@ namespace MVP.Conversation
         [SerializeField] private bool useXriPushToTalk = true;
         [SerializeField] private InputActionReference pushToTalkAction;
         [SerializeField] private float minimumHoldSeconds = 0.12f;
+        [SerializeField] private bool allowBargeInWhileSpeaking = true;
 
         [Header("Debug Output")]
         [SerializeField] private bool includeAssistantTextInMetrics = true;
@@ -34,14 +36,19 @@ namespace MVP.Conversation
         private ISTTService sttService;
         private ITTSService ttsService;
         private IStreamingTTSService streamingTtsService;
+        private IInterruptibleTTSService interruptibleTtsService;
 
         private bool isRunningConversation;
         private bool isHoldingToTalk;
+        private bool isAssistantSpeaking;
         private float holdStartTime;
+        private int activeTurnId;
         private Coroutine currentConversationRoutine;
 
         public bool IsHoldingToTalk => isHoldingToTalk;
         public bool IsRunningConversation => isRunningConversation;
+        public bool IsAssistantSpeaking => isAssistantSpeaking;
+        public int ActiveTurnId => activeTurnId;
 
         private void Awake()
         {
@@ -55,6 +62,7 @@ namespace MVP.Conversation
             {
                 ttsService = ttsServiceBehaviour as ITTSService;
                 streamingTtsService = ttsServiceBehaviour as IStreamingTTSService;
+                interruptibleTtsService = ttsServiceBehaviour as IInterruptibleTTSService;
             }
 
             if (chatService == null)
@@ -87,13 +95,12 @@ namespace MVP.Conversation
 
         private void Start()
         {
-
-            #if PLATFORM_ANDROID
-                    if (!Permission.HasUserAuthorizedPermission(Permission.Microphone))
-                    {
-                        Permission.RequestUserPermission(Permission.Microphone);
-                    }
-            #endif
+#if PLATFORM_ANDROID
+            if (!Permission.HasUserAuthorizedPermission(Permission.Microphone))
+            {
+                Permission.RequestUserPermission(Permission.Microphone);
+            }
+#endif
             if (!SessionManager.HasActiveSession)
             {
                 SessionManager.StartNewSession();
@@ -140,19 +147,28 @@ namespace MVP.Conversation
 
         public void StartTextConversation(string userText)
         {
-            if (isRunningConversation || string.IsNullOrWhiteSpace(userText))
+            if (string.IsNullOrWhiteSpace(userText) || isHoldingToTalk)
                 return;
 
-            if (currentConversationRoutine != null)
-                StopCoroutine(currentConversationRoutine);
+            InterruptCurrentAssistantOutput(stopConversationCoroutine: true, cancelPendingWork: true, reason: "StartTextConversation");
 
-            currentConversationRoutine = StartCoroutine(RunTextConversation(userText));
+            int nextTurnId = ++activeTurnId;
+            worldSpaceDebugPanel?.AppendTelemetryEvent($"Text conversation start turn={nextTurnId}");
+            currentConversationRoutine = StartCoroutine(RunTextConversation(userText, nextTurnId));
         }
 
         public void BeginPushToTalk()
         {
-            if (isRunningConversation || isHoldingToTalk || microphoneRecorder == null)
+            if (isHoldingToTalk || microphoneRecorder == null)
                 return;
+
+            if (isRunningConversation)
+            {
+                if (!allowBargeInWhileSpeaking)
+                    return;
+
+                InterruptCurrentAssistantOutput(stopConversationCoroutine: true, cancelPendingWork: true, reason: "PTT barge-in");
+            }
 
             microphoneRecorder.StartRecording();
 
@@ -166,11 +182,13 @@ namespace MVP.Conversation
             isHoldingToTalk = true;
             holdStartTime = Time.realtimeSinceStartup;
             UpdatePanelState("Recording");
+            UpdatePanelBackendInfo("-");
+            worldSpaceDebugPanel?.AppendTelemetryEvent($"PTT begin turn={activeTurnId} speakingInterrupted={allowBargeInWhileSpeaking}");
         }
 
         public void EndPushToTalkAndSend()
         {
-            if (!isHoldingToTalk || isRunningConversation || microphoneRecorder == null)
+            if (!isHoldingToTalk || microphoneRecorder == null)
                 return;
 
             isHoldingToTalk = false;
@@ -194,28 +212,15 @@ namespace MVP.Conversation
                 return;
             }
 
-            if (currentConversationRoutine != null)
-                StopCoroutine(currentConversationRoutine);
-
-            currentConversationRoutine = StartCoroutine(RunVoiceConversationFromClip(clip));
+            InterruptCurrentAssistantOutput(stopConversationCoroutine: true, cancelPendingWork: true, reason: "PTT send");
+            int nextTurnId = ++activeTurnId;
+            worldSpaceDebugPanel?.AppendTelemetryEvent($"PTT end -> send voice turn={nextTurnId} held={heldSeconds:F2}s");
+            currentConversationRoutine = StartCoroutine(RunVoiceConversationFromClip(clip, nextTurnId));
         }
 
         public void StartNewAnonymousUserSession()
         {
-            if (currentConversationRoutine != null)
-            {
-                StopCoroutine(currentConversationRoutine);
-                currentConversationRoutine = null;
-            }
-
-            isRunningConversation = false;
-            isHoldingToTalk = false;
-
-            if (avatarAudioSource != null)
-            {
-                avatarAudioSource.Stop();
-                avatarAudioSource.clip = null;
-            }
+            InterruptCurrentAssistantOutput(stopConversationCoroutine: true, cancelPendingWork: true, reason: "New anonymous session");
 
             if (chatService is IConversationResettable resettable)
                 resettable.ResetConversationContext();
@@ -229,9 +234,40 @@ namespace MVP.Conversation
             UpdatePanelBackendInfo($"Nuevo usuario activo. Session ID: {SessionManager.CurrentSessionId}");
         }
 
-        private IEnumerator RunTextConversation(string userText)
+        private void InterruptCurrentAssistantOutput(bool stopConversationCoroutine, bool cancelPendingWork, string reason)
+        {
+            if (cancelPendingWork)
+                activeTurnId++;
+
+            if (stopConversationCoroutine && currentConversationRoutine != null)
+            {
+                StopCoroutine(currentConversationRoutine);
+                currentConversationRoutine = null;
+            }
+
+            isRunningConversation = false;
+            isAssistantSpeaking = false;
+
+            interruptibleTtsService?.InterruptPlayback();
+
+            if (avatarAudioSource != null)
+            {
+                avatarAudioSource.Stop();
+                avatarAudioSource.clip = null;
+            }
+
+            if (microphoneRecorder != null && microphoneRecorder.IsRecording)
+                microphoneRecorder.StopRecording();
+
+            Debug.Log($"[OpenAIConversationController] Interrupted current assistant output. reason={reason}, activeTurnId={activeTurnId}");
+
+            worldSpaceDebugPanel?.AppendTelemetryEvent($"Interrupt reason={reason} turn={activeTurnId}");
+        }
+
+        private IEnumerator RunTextConversation(string userText, int turnId)
         {
             isRunningConversation = true;
+            isAssistantSpeaking = false;
 
             var result = new ConversationResult
             {
@@ -260,6 +296,9 @@ namespace MVP.Conversation
                 });
             }
 
+            if (!IsTurnCurrent(turnId))
+                yield break;
+
             result.timing.StopChat();
 
             if (!string.IsNullOrEmpty(chatError) || chatResult == null || string.IsNullOrWhiteSpace(chatResult.responseText))
@@ -272,21 +311,20 @@ namespace MVP.Conversation
                 yield break;
             }
 
-            result.assistantText = chatResult.responseText;
-            result.emotion = chatResult.emotion;
-            result.intentTags = chatResult.intentTags ?? new List<IntentTag>();
-            result.backendLatencyMs = chatResult.latencyMs;
-            result.backendModel = chatResult.model;
-            result.backendRagHits = chatResult.ragHits;
-            result.backendSourceTitles = chatResult.sourceTitles ?? new List<string>();
+            PopulateResultFromChat(result, chatResult);
 
             worldSpaceDebugPanel?.SetAssistantTranscript(result.assistantText);
             emotionController?.ApplyEmotion(result.emotion, result.intentTags);
 
-            yield return PlayAssistantReplyWithTts(result);
+            yield return PlayAssistantReplyWithTts(result, turnId);
+
+            if (!IsTurnCurrent(turnId))
+                yield break;
 
             result.timing.StopTotal();
             isRunningConversation = false;
+            isAssistantSpeaking = false;
+            currentConversationRoutine = null;
 
             if (SessionManager.HasActiveSession)
                 SessionManager.RegisterTurn();
@@ -295,9 +333,10 @@ namespace MVP.Conversation
             UpdatePanelState("Idle");
         }
 
-        private IEnumerator RunVoiceConversationFromClip(AudioClip clip)
+        private IEnumerator RunVoiceConversationFromClip(AudioClip clip, int turnId)
         {
             isRunningConversation = true;
+            isAssistantSpeaking = false;
 
             var result = new ConversationResult();
             result.timing.StartTotal();
@@ -322,7 +361,6 @@ namespace MVP.Conversation
             );
 
             AudioClip clipToSend = trimmedClip != null ? trimmedClip : clip;
-            // AudioClip clipToSend = clip;
             byte[] wavBytes = WavUtility.FromAudioClip(clipToSend);
 
             string userText = null;
@@ -340,6 +378,9 @@ namespace MVP.Conversation
             {
                 sttError = "No STT service configured.";
             }
+
+            if (!IsTurnCurrent(turnId))
+                yield break;
 
             result.timing.StopStt();
 
@@ -375,6 +416,9 @@ namespace MVP.Conversation
                 });
             }
 
+            if (!IsTurnCurrent(turnId))
+                yield break;
+
             result.timing.StopChat();
 
             if (!string.IsNullOrEmpty(chatError) || chatResult == null || string.IsNullOrWhiteSpace(chatResult.responseText))
@@ -387,21 +431,20 @@ namespace MVP.Conversation
                 yield break;
             }
 
-            result.assistantText = chatResult.responseText;
-            result.emotion = chatResult.emotion;
-            result.intentTags = chatResult.intentTags ?? new List<IntentTag>();
-            result.backendLatencyMs = chatResult.latencyMs;
-            result.backendModel = chatResult.model;
-            result.backendRagHits = chatResult.ragHits;
-            result.backendSourceTitles = chatResult.sourceTitles ?? new List<string>();
+            PopulateResultFromChat(result, chatResult);
 
             worldSpaceDebugPanel?.SetAssistantTranscript(result.assistantText);
             emotionController?.ApplyEmotion(result.emotion, result.intentTags);
 
-            yield return PlayAssistantReplyWithTts(result);
+            yield return PlayAssistantReplyWithTts(result, turnId);
+
+            if (!IsTurnCurrent(turnId))
+                yield break;
 
             result.timing.StopTotal();
             isRunningConversation = false;
+            isAssistantSpeaking = false;
+            currentConversationRoutine = null;
 
             if (SessionManager.HasActiveSession)
                 SessionManager.RegisterTurn();
@@ -410,7 +453,7 @@ namespace MVP.Conversation
             UpdatePanelState("Idle");
         }
 
-        private IEnumerator PlayAssistantReplyWithTts(ConversationResult result)
+        private IEnumerator PlayAssistantReplyWithTts(ConversationResult result, int turnId)
         {
             if (string.IsNullOrWhiteSpace(result.assistantText))
             {
@@ -433,26 +476,40 @@ namespace MVP.Conversation
                     avatarAudioSource,
                     onPlaybackStarted: () =>
                     {
-                        if (playbackMarked)
+                        if (!IsTurnCurrent(turnId) || playbackMarked)
                             return;
 
                         playbackMarked = true;
+                        isAssistantSpeaking = true;
                         result.timing.StopTts();
                         result.timing.MarkPlaybackStart();
                         UpdatePanelState("Speaking");
+                        worldSpaceDebugPanel?.AppendTelemetryEvent($"Playback started turn={turnId}");
                     },
                     onError: err =>
                     {
+                        if (!IsTurnCurrent(turnId))
+                            return;
+
                         streamingError = err;
                     },
                     onCompleted: () =>
                     {
+                        if (!IsTurnCurrent(turnId))
+                            return;
+
+                        isAssistantSpeaking = false;
                         result.timing.MarkPlaybackEnd();
+                        worldSpaceDebugPanel?.AppendTelemetryEvent($"Playback completed turn={turnId}");
                     });
+
+                if (!IsTurnCurrent(turnId))
+                    yield break;
 
                 if (!string.IsNullOrEmpty(streamingError))
                 {
                     result.error = streamingError;
+                    isAssistantSpeaking = false;
                     UpdatePanelState("Error");
                     UpdatePanelBackendInfo(streamingError);
                     yield break;
@@ -467,6 +524,7 @@ namespace MVP.Conversation
                 if (result.timing.playbackEndTime <= 0.0)
                     result.timing.MarkPlaybackEnd();
 
+                isAssistantSpeaking = false;
                 yield break;
             }
 
@@ -490,6 +548,9 @@ namespace MVP.Conversation
                 ttsError = err;
             });
 
+            if (!IsTurnCurrent(turnId))
+                yield break;
+
             result.timing.StopTts();
 
             if (!string.IsNullOrEmpty(ttsError))
@@ -509,13 +570,37 @@ namespace MVP.Conversation
             }
 
             UpdatePanelState("Speaking");
+            isAssistantSpeaking = true;
+            worldSpaceDebugPanel?.AppendTelemetryEvent($"Non-streaming playback started turn={turnId}");
             avatarAudioSource.Stop();
             avatarAudioSource.clip = ttsClip;
             avatarAudioSource.Play();
 
             result.timing.MarkPlaybackStart();
             yield return new WaitForSeconds(ttsClip.length);
+
+            if (!IsTurnCurrent(turnId))
+                yield break;
+
+            isAssistantSpeaking = false;
             result.timing.MarkPlaybackEnd();
+            worldSpaceDebugPanel?.AppendTelemetryEvent($"Non-streaming playback completed turn={turnId}");
+        }
+
+        private bool IsTurnCurrent(int turnId)
+        {
+            return turnId == activeTurnId;
+        }
+
+        private void PopulateResultFromChat(ConversationResult result, ChatServiceResult chatResult)
+        {
+            result.assistantText = chatResult.responseText;
+            result.emotion = chatResult.emotion;
+            result.intentTags = chatResult.intentTags ?? new List<IntentTag>();
+            result.backendLatencyMs = chatResult.latencyMs;
+            result.backendModel = chatResult.model;
+            result.backendRagHits = chatResult.ragHits;
+            result.backendSourceTitles = chatResult.sourceTitles ?? new List<string>();
         }
 
         private void LogTiming(ConversationResult result)
