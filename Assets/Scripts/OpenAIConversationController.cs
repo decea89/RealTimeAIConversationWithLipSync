@@ -1,4 +1,4 @@
-// OpenAIConversationController.cs
+// OpenAIConversationController.cs (rama realtime)
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
@@ -14,7 +14,7 @@ namespace MVP.Conversation
         [Header("Dependencies")]
         [SerializeField] private MonoBehaviour chatServiceBehaviour;
         [SerializeField] private MonoBehaviour sttServiceBehaviour;
-        [SerializeField] private MonoBehaviour ttsServiceBehaviour;
+        [SerializeField] private MonoBehaviour realtimeTtsServiceBehaviour;
         [SerializeField] private MicrophoneRecorder microphoneRecorder;
         [SerializeField] private AudioSource avatarAudioSource;
         [SerializeField] private AvatarEmotionController emotionController;
@@ -34,9 +34,7 @@ namespace MVP.Conversation
 
         private IChatService chatService;
         private ISTTService sttService;
-        private ITTSService ttsService;
-        private IStreamingTTSService streamingTtsService;
-        private IInterruptibleTTSService interruptibleTtsService;
+        private IRealtimeTTSService realtimeTtsService;
 
         private bool isRunningConversation;
         private bool isHoldingToTalk;
@@ -58,12 +56,8 @@ namespace MVP.Conversation
             if (sttServiceBehaviour != null)
                 sttService = sttServiceBehaviour as ISTTService;
 
-            if (ttsServiceBehaviour != null)
-            {
-                ttsService = ttsServiceBehaviour as ITTSService;
-                streamingTtsService = ttsServiceBehaviour as IStreamingTTSService;
-                interruptibleTtsService = ttsServiceBehaviour as IInterruptibleTTSService;
-            }
+            if (realtimeTtsServiceBehaviour != null)
+                realtimeTtsService = realtimeTtsServiceBehaviour as IRealtimeTTSService;
 
             if (chatService == null)
                 Debug.LogError("[OpenAIConversationController] Chat service behaviour is not set or does not implement IChatService.");
@@ -71,8 +65,8 @@ namespace MVP.Conversation
             if (sttServiceBehaviour != null && sttService == null)
                 Debug.LogError("[OpenAIConversationController] STT service behaviour is set but does not implement ISTTService.");
 
-            if (ttsService == null && streamingTtsService == null)
-                Debug.LogError("[OpenAIConversationController] TTS service behaviour is not set or does not implement ITTSService or IStreamingTTSService.");
+            if (realtimeTtsService == null)
+                Debug.LogError("[OpenAIConversationController] realtimeTtsServiceBehaviour is not set or does not implement IRealtimeTTSService.");
 
             if (avatarAudioSource == null)
                 Debug.LogError("[OpenAIConversationController] Avatar AudioSource is not assigned.");
@@ -150,7 +144,7 @@ namespace MVP.Conversation
             if (string.IsNullOrWhiteSpace(userText) || isHoldingToTalk)
                 return;
 
-            InterruptCurrentAssistantOutput(stopConversationCoroutine: true, cancelPendingWork: true, reason: "StartTextConversation");
+            InterruptAudioAndConversation("StartTextConversation");
 
             int nextTurnId = ++activeTurnId;
             worldSpaceDebugPanel?.AppendTelemetryEvent($"Text conversation start turn={nextTurnId}");
@@ -167,7 +161,7 @@ namespace MVP.Conversation
                 if (!allowBargeInWhileSpeaking)
                     return;
 
-                InterruptCurrentAssistantOutput(stopConversationCoroutine: true, cancelPendingWork: true, reason: "PTT barge-in");
+                InterruptAudioAndConversation("PTT barge-in");
             }
 
             microphoneRecorder.StartRecording();
@@ -183,7 +177,7 @@ namespace MVP.Conversation
             holdStartTime = Time.realtimeSinceStartup;
             UpdatePanelState("Recording");
             UpdatePanelBackendInfo("-");
-            worldSpaceDebugPanel?.AppendTelemetryEvent($"PTT begin turn={activeTurnId} speakingInterrupted={allowBargeInWhileSpeaking}");
+            worldSpaceDebugPanel?.AppendTelemetryEvent($"PTT begin turn={activeTurnId} bargeIn={allowBargeInWhileSpeaking}");
         }
 
         public void EndPushToTalkAndSend()
@@ -212,7 +206,8 @@ namespace MVP.Conversation
                 return;
             }
 
-            InterruptCurrentAssistantOutput(stopConversationCoroutine: true, cancelPendingWork: true, reason: "PTT send");
+            InterruptAudioAndConversation("PTT send");
+
             int nextTurnId = ++activeTurnId;
             worldSpaceDebugPanel?.AppendTelemetryEvent($"PTT end -> send voice turn={nextTurnId} held={heldSeconds:F2}s");
             currentConversationRoutine = StartCoroutine(RunVoiceConversationFromClip(clip, nextTurnId));
@@ -220,7 +215,7 @@ namespace MVP.Conversation
 
         public void StartNewAnonymousUserSession()
         {
-            InterruptCurrentAssistantOutput(stopConversationCoroutine: true, cancelPendingWork: true, reason: "New anonymous session");
+            InterruptAudioAndConversation("New anonymous session");
 
             if (chatService is IConversationResettable resettable)
                 resettable.ResetConversationContext();
@@ -234,12 +229,11 @@ namespace MVP.Conversation
             UpdatePanelBackendInfo($"Nuevo usuario activo. Session ID: {SessionManager.CurrentSessionId}");
         }
 
-        private void InterruptCurrentAssistantOutput(bool stopConversationCoroutine, bool cancelPendingWork, string reason)
+        private void InterruptAudioAndConversation(string reason)
         {
-            if (cancelPendingWork)
-                activeTurnId++;
+            activeTurnId++;
 
-            if (stopConversationCoroutine && currentConversationRoutine != null)
+            if (currentConversationRoutine != null)
             {
                 StopCoroutine(currentConversationRoutine);
                 currentConversationRoutine = null;
@@ -248,7 +242,7 @@ namespace MVP.Conversation
             isRunningConversation = false;
             isAssistantSpeaking = false;
 
-            interruptibleTtsService?.InterruptPlayback();
+            realtimeTtsService?.CancelAll();
 
             if (avatarAudioSource != null)
             {
@@ -259,8 +253,7 @@ namespace MVP.Conversation
             if (microphoneRecorder != null && microphoneRecorder.IsRecording)
                 microphoneRecorder.StopRecording();
 
-            Debug.Log($"[OpenAIConversationController] Interrupted current assistant output. reason={reason}, activeTurnId={activeTurnId}");
-
+            Debug.Log($"[OpenAIConversationController] InterruptAudioAndConversation reason={reason}, activeTurnId={activeTurnId}");
             worldSpaceDebugPanel?.AppendTelemetryEvent($"Interrupt reason={reason} turn={activeTurnId}");
         }
 
@@ -316,7 +309,7 @@ namespace MVP.Conversation
             worldSpaceDebugPanel?.SetAssistantTranscript(result.assistantText);
             emotionController?.ApplyEmotion(result.emotion, result.intentTags);
 
-            yield return PlayAssistantReplyWithTts(result, turnId);
+            yield return PlayAssistantReplyRealtime(result, turnId);
 
             if (!IsTurnCurrent(turnId))
                 yield break;
@@ -436,7 +429,7 @@ namespace MVP.Conversation
             worldSpaceDebugPanel?.SetAssistantTranscript(result.assistantText);
             emotionController?.ApplyEmotion(result.emotion, result.intentTags);
 
-            yield return PlayAssistantReplyWithTts(result, turnId);
+            yield return PlayAssistantReplyRealtime(result, turnId);
 
             if (!IsTurnCurrent(turnId))
                 yield break;
@@ -453,7 +446,7 @@ namespace MVP.Conversation
             UpdatePanelState("Idle");
         }
 
-        private IEnumerator PlayAssistantReplyWithTts(ConversationResult result, int turnId)
+        private IEnumerator PlayAssistantReplyRealtime(ConversationResult result, int turnId)
         {
             if (string.IsNullOrWhiteSpace(result.assistantText))
             {
@@ -463,74 +456,9 @@ namespace MVP.Conversation
                 yield break;
             }
 
-            if (streamingTtsService != null)
+            if (realtimeTtsService == null)
             {
-                UpdatePanelState("TTS");
-                result.timing.StartTts();
-
-                string streamingError = null;
-                bool playbackMarked = false;
-
-                yield return streamingTtsService.RequestSpeechStreamed(
-                    result.assistantText,
-                    avatarAudioSource,
-                    onPlaybackStarted: () =>
-                    {
-                        if (!IsTurnCurrent(turnId) || playbackMarked)
-                            return;
-
-                        playbackMarked = true;
-                        isAssistantSpeaking = true;
-                        result.timing.StopTts();
-                        result.timing.MarkPlaybackStart();
-                        UpdatePanelState("Speaking");
-                        worldSpaceDebugPanel?.AppendTelemetryEvent($"Playback started turn={turnId}");
-                    },
-                    onError: err =>
-                    {
-                        if (!IsTurnCurrent(turnId))
-                            return;
-
-                        streamingError = err;
-                    },
-                    onCompleted: () =>
-                    {
-                        if (!IsTurnCurrent(turnId))
-                            return;
-
-                        isAssistantSpeaking = false;
-                        result.timing.MarkPlaybackEnd();
-                        worldSpaceDebugPanel?.AppendTelemetryEvent($"Playback completed turn={turnId}");
-                    });
-
-                if (!IsTurnCurrent(turnId))
-                    yield break;
-
-                if (!string.IsNullOrEmpty(streamingError))
-                {
-                    result.error = streamingError;
-                    isAssistantSpeaking = false;
-                    UpdatePanelState("Error");
-                    UpdatePanelBackendInfo(streamingError);
-                    yield break;
-                }
-
-                if (!playbackMarked)
-                {
-                    result.timing.StopTts();
-                    result.timing.MarkPlaybackStart();
-                }
-
-                if (result.timing.playbackEndTime <= 0.0)
-                    result.timing.MarkPlaybackEnd();
-
-                isAssistantSpeaking = false;
-                yield break;
-            }
-
-            if (ttsService == null)
-            {
-                result.error = "TTS service not configured.";
+                result.error = "Realtime TTS service not configured.";
                 UpdatePanelState("Error");
                 UpdatePanelBackendInfo(result.error);
                 yield break;
@@ -539,52 +467,68 @@ namespace MVP.Conversation
             UpdatePanelState("TTS");
             result.timing.StartTts();
 
-            AudioClip ttsClip = null;
-            string ttsError = null;
+            bool playbackStarted = false;
+            string streamError = null;
 
-            yield return ttsService.RequestSpeech(result.assistantText, (clip, err) =>
+            var handle = realtimeTtsService.StartStream(
+                result.assistantText,
+                turnId,
+                onAudioBegan: () =>
+                {
+                    if (!IsTurnCurrent(turnId) || playbackStarted)
+                        return;
+
+                    playbackStarted = true;
+                    isAssistantSpeaking = true;
+
+                    result.timing.StopTts();
+                    result.timing.MarkPlaybackStart();
+
+                    UpdatePanelState("Speaking");
+                    worldSpaceDebugPanel?.AppendTelemetryEvent($"Realtime playback started turn={turnId}");
+                },
+                onError: err =>
+                {
+                    if (!IsTurnCurrent(turnId))
+                        return;
+
+                    streamError = err;
+                });
+
+            if (handle == null)
             {
-                ttsClip = clip;
-                ttsError = err;
-            });
-
-            if (!IsTurnCurrent(turnId))
-                yield break;
-
-            result.timing.StopTts();
-
-            if (!string.IsNullOrEmpty(ttsError))
-            {
-                result.error = ttsError;
-                UpdatePanelState("Error");
-                UpdatePanelBackendInfo(ttsError);
-                yield break;
-            }
-
-            if (ttsClip == null)
-            {
-                result.error = "TTS devolvió un clip nulo.";
+                result.error = "No se pudo iniciar el stream de TTS.";
                 UpdatePanelState("Error");
                 UpdatePanelBackendInfo(result.error);
                 yield break;
             }
 
-            UpdatePanelState("Speaking");
-            isAssistantSpeaking = true;
-            worldSpaceDebugPanel?.AppendTelemetryEvent($"Non-streaming playback started turn={turnId}");
-            avatarAudioSource.Stop();
-            avatarAudioSource.clip = ttsClip;
-            avatarAudioSource.Play();
+            float safetyTimeout = 60f;
+            float endTime = Time.time + safetyTimeout;
 
-            result.timing.MarkPlaybackStart();
-            yield return new WaitForSeconds(ttsClip.length);
+            while (!handle.IsCompleted && Time.time < endTime)
+            {
+                if (!IsTurnCurrent(turnId))
+                    yield break;
+
+                yield return null;
+            }
 
             if (!IsTurnCurrent(turnId))
                 yield break;
 
             isAssistantSpeaking = false;
+
+            if (!string.IsNullOrEmpty(streamError))
+            {
+                result.error = streamError;
+                UpdatePanelState("Error");
+                UpdatePanelBackendInfo(streamError);
+                yield break;
+            }
+
             result.timing.MarkPlaybackEnd();
-            worldSpaceDebugPanel?.AppendTelemetryEvent($"Non-streaming playback completed turn={turnId}");
+            worldSpaceDebugPanel?.AppendTelemetryEvent($"Realtime playback completed turn={turnId}");
         }
 
         private bool IsTurnCurrent(int turnId)
