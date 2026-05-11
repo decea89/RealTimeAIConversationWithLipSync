@@ -2878,6 +2878,54 @@ CanvasRenderer:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1486677401}
   m_CullTransparentMesh: 0
+--- !u!1 &1495054822
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1495054823}
+  - component: {fileID: 1495054824}
+  m_Layer: 0
+  m_Name: RealTimeTTS
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &1495054823
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1495054822}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 6509928022762900343}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &1495054824
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1495054822}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 894af6ebe9223dc44860a8003e8f5bab, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::MVP.Conversation.RealtimeOpenAITTSClient
+  innerTtsServiceBehaviour: {fileID: 3431682967973185271}
+  realtimeAudioPlayer: {fileID: 9206487418811563760}
+  maxChunkChars: 80
+  interChunkGapSeconds: 0
 --- !u!1001 &1519520462
 PrefabInstance:
   m_ObjectHideFlags: 0
@@ -5821,6 +5869,9 @@ PrefabInstance:
     - targetCorrespondingSourceObject: {fileID: 100016, guid: cbaf1c32e7ec84f10a51be1b09c0ef46, type: 3}
       insertIndex: -1
       addedObject: {fileID: 7116075082752787612}
+    - targetCorrespondingSourceObject: {fileID: 100016, guid: cbaf1c32e7ec84f10a51be1b09c0ef46, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 9206487418811563760}
   m_SourcePrefab: {fileID: 100100000, guid: cbaf1c32e7ec84f10a51be1b09c0ef46, type: 3}
 --- !u!137 &1057209825567806926 stripped
 SkinnedMeshRenderer:
@@ -9848,12 +9899,13 @@ MonoBehaviour:
   apiKey: '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 '
   endpoint: https://api.openai.com/v1/audio/speech
   model: gpt-4o-mini-tts
-  voice: echo
+  voice: onyx
   sampleRate: 24000
   channels: 1
-  instructions: 'Speak in a warm, natural, conversational tone suitable for a VR
-    character. Keep the pacing clear and slightly expressive. Give short answers:
-    1-2 short sentences '
+  instructions: "Habla en espa\xF1ol de Espa\xF1a, castellano peninsular, con pronunciaci\xF3n
+    natural de Castilla y Le\xF3n.\r\nEvita acento latinoamericano, evita voseo y
+    evita seseo hispanoamericano.\r\nTono culto, sereno y propio de un personaje
+    hist\xF3rico espa\xF1ol. Respuestas cortas: 1-2 frases cortas. "
 --- !u!114 &3511719192435144052
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -11607,7 +11659,7 @@ AudioSource:
     m_Curve:
     - serializedVersion: 3
       time: 0
-      value: 1
+      value: 0
       inSlope: 0
       outSlope: 0
       tangentMode: 0
@@ -18706,6 +18758,7 @@ Transform:
   - {fileID: 8001207605022050885}
   - {fileID: 8526676920109325393}
   - {fileID: 2247668078567943131}
+  - {fileID: 1495054823}
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &6642858948686634561
@@ -19970,7 +20023,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::MVP.Conversation.OpenAIConversationController
   chatServiceBehaviour: {fileID: 4962318199887468802}
   sttServiceBehaviour: {fileID: 8961722755474951144}
-  ttsServiceBehaviour: {fileID: 8804760683131486805}
+  realtimeTtsServiceBehaviour: {fileID: 1495054824}
   microphoneRecorder: {fileID: 478939891519281301}
   avatarAudioSource: {fileID: 4032331762414432206}
   emotionController: {fileID: 0}
@@ -19980,8 +20033,9 @@ MonoBehaviour:
   useXriPushToTalk: 1
   pushToTalkAction: {fileID: -6131295136447488360, guid: c348712bda248c246b8c49b3db54643f, type: 3}
   minimumHoldSeconds: 0.12
-  includeAssistantTextInMetrics: 1
-  includeSourcesInBackendInfo: 1
+  allowBargeInWhileSpeaking: 1
+  includeAssistantTextInMetrics: 0
+  includeSourcesInBackendInfo: 0
 --- !u!33 &8227239891672207589
 MeshFilter:
   m_ObjectHideFlags: 0
@@ -20362,8 +20416,9 @@ MonoBehaviour:
   newUserButton: {fileID: 5983981772312395631}
   clearTranscriptButton: {fileID: 811612426324557952}
   clearLogsButton: {fileID: 6917058404344353846}
-  captureUnityLogs: 1
-  maxLogLines: 30
+  captureUnityLogs: 0
+  maxLogLines: 8
+  includeControllerHeartbeat: 0
 --- !u!114 &8660496693523707530
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -20559,7 +20614,7 @@ MonoBehaviour:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 2858713071791873685}
-  m_Enabled: 1
+  m_Enabled: 0
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 2938b2a3ea0a5a040a7cd2974cc1c5b4, type: 3}
   m_Name: 
@@ -21075,6 +21130,20 @@ MonoBehaviour:
   debugLaughterKey: 104
   showLaughter: 1
   laughterScore: 0
+--- !u!114 &9206487418811563760
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1057209825567806928}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 9a5871d8c1322c14198bfd34d08228d4, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::MVP.Conversation.RealtimeAudioPlayer
+  bufferCapacitySamples: 176400
+  prebufferSamples: 1024
 --- !u!1660057539 &9223372036854775807
 SceneRoots:
   m_ObjectHideFlags: 0

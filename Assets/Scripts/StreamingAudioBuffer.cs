@@ -24,6 +24,15 @@ namespace MVP.Conversation
             }
         }
 
+        public int FreeSamples
+        {
+            get
+            {
+                lock (locker)
+                    return capacity - availableSamples;
+            }
+        }
+
         public long TotalSamplesWritten
         {
             get
@@ -61,29 +70,23 @@ namespace MVP.Conversation
             }
         }
 
-        public void Write(float[] samples, int sampleCount)
+        public int WriteSome(float[] samples, int offset, int sampleCount)
         {
-            if (samples == null || sampleCount <= 0)
-                return;
+            if (samples == null || sampleCount <= 0 || offset < 0 || offset >= samples.Length)
+                return 0;
 
             lock (locker)
             {
-                for (int i = 0; i < sampleCount; i++)
+                int writable = Mathf.Min(sampleCount, capacity - availableSamples);
+                for (int i = 0; i < writable; i++)
                 {
-                    buffer[writePos] = samples[i];
+                    buffer[writePos] = samples[offset + i];
                     writePos = (writePos + 1) % capacity;
-
-                    if (availableSamples < capacity)
-                    {
-                        availableSamples++;
-                    }
-                    else
-                    {
-                        readPos = (readPos + 1) % capacity;
-                    }
-
+                    availableSamples++;
                     totalSamplesWritten++;
                 }
+
+                return writable;
             }
         }
 
