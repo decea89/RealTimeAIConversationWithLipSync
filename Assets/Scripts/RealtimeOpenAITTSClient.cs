@@ -37,6 +37,18 @@ namespace MVP.Conversation
         private readonly List<RealtimeTTSHandle> activeHandles = new();
         private int generationId;
 
+        public int MaxChunkChars
+        {
+            get => maxChunkChars;
+            set => maxChunkChars = Mathf.Max(1, value);
+        }
+
+        public float InterChunkGapSeconds
+        {
+            get => interChunkGapSeconds;
+            set => interChunkGapSeconds = Mathf.Max(0f, value);
+        }
+
         private void Awake()
         {
             if (innerTtsServiceBehaviour != null)
