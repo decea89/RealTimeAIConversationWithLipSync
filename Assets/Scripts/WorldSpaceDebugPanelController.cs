@@ -13,7 +13,7 @@ namespace MVP.Conversation
         [Header("Core References")]
         [SerializeField] private OpenAIConversationController conversationController;
         [SerializeField] private AudioSource avatarAudioSource;
-        [SerializeField] private SegmentedBufferedTTSClient segmentedTtsClient;
+        [SerializeField] private RealtimeOpenAITTSClient realtimeTtsClient;
         [SerializeField] private MonoBehaviour lipSyncBehaviour;
         [SerializeField] private MonoBehaviour emotionBehaviour;
 
@@ -32,20 +32,16 @@ namespace MVP.Conversation
         [SerializeField] private Toggle showAssistantTextToggle;
         [SerializeField] private Toggle showBackendInfoToggle;
         [SerializeField] private Toggle showSourcesToggle;
-        [SerializeField] private Toggle logSegmentsToggle;
 
         [Header("Sliders")]
         [SerializeField] private Slider volumeSlider;
         [SerializeField] private TMP_Text volumeValueText;
 
-        [SerializeField] private Slider transitionPaddingSlider;
-        [SerializeField] private TMP_Text transitionPaddingValueText;
+        [SerializeField] private Slider maxChunkCharsSlider;
+        [SerializeField] private TMP_Text maxChunkCharsValueText;
 
-        [SerializeField] private Slider maxWaitNextSegmentSlider;
-        [SerializeField] private TMP_Text maxWaitNextSegmentValueText;
-
-        [SerializeField] private Slider maxSegmentCharsSlider;
-        [SerializeField] private TMP_Text maxSegmentCharsValueText;
+        [SerializeField] private Slider interChunksGapSlider;
+        [SerializeField] private TMP_Text interChunksGapValueText;
 
         [Header("Buttons")]
         [SerializeField] private Button newUserButton;
@@ -120,20 +116,14 @@ namespace MVP.Conversation
             if (showSourcesToggle != null)
                 showSourcesToggle.onValueChanged.AddListener(_ => RefreshBackendText());
 
-            if (logSegmentsToggle != null)
-                logSegmentsToggle.onValueChanged.AddListener(OnLogSegmentsToggleChanged);
-
             if (volumeSlider != null)
                 volumeSlider.onValueChanged.AddListener(OnVolumeSliderChanged);
 
-            if (transitionPaddingSlider != null)
-                transitionPaddingSlider.onValueChanged.AddListener(OnTransitionPaddingSliderChanged);
+            if (maxChunkCharsSlider != null)
+                maxChunkCharsSlider.onValueChanged.AddListener(OnMaxChunkCharsSliderChanged);
 
-            if (maxWaitNextSegmentSlider != null)
-                maxWaitNextSegmentSlider.onValueChanged.AddListener(OnMaxWaitNextSegmentSliderChanged);
-
-            if (maxSegmentCharsSlider != null)
-                maxSegmentCharsSlider.onValueChanged.AddListener(OnMaxSegmentCharsSliderChanged);
+            if (interChunksGapSlider != null)
+                interChunksGapSlider.onValueChanged.AddListener(OnInterChunksGapSliderChanged);
 
             if (newUserButton != null)
                 newUserButton.onClick.AddListener(OnNewUserClicked);
@@ -162,20 +152,14 @@ namespace MVP.Conversation
             if (showSourcesToggle != null)
                 showSourcesToggle.onValueChanged.RemoveAllListeners();
 
-            if (logSegmentsToggle != null)
-                logSegmentsToggle.onValueChanged.RemoveListener(OnLogSegmentsToggleChanged);
-
             if (volumeSlider != null)
                 volumeSlider.onValueChanged.RemoveListener(OnVolumeSliderChanged);
 
-            if (transitionPaddingSlider != null)
-                transitionPaddingSlider.onValueChanged.RemoveListener(OnTransitionPaddingSliderChanged);
+            if (maxChunkCharsSlider != null)
+                maxChunkCharsSlider.onValueChanged.RemoveListener(OnMaxChunkCharsSliderChanged);
 
-            if (maxWaitNextSegmentSlider != null)
-                maxWaitNextSegmentSlider.onValueChanged.RemoveListener(OnMaxWaitNextSegmentSliderChanged);
-
-            if (maxSegmentCharsSlider != null)
-                maxSegmentCharsSlider.onValueChanged.RemoveListener(OnMaxSegmentCharsSliderChanged);
+            if (interChunksGapSlider != null)
+                interChunksGapSlider.onValueChanged.RemoveListener(OnInterChunksGapSliderChanged);
 
             if (newUserButton != null)
                 newUserButton.onClick.RemoveListener(OnNewUserClicked);
@@ -291,32 +275,22 @@ namespace MVP.Conversation
             if (volumeValueText != null && avatarAudioSource != null)
                 UpdateSliderLabel(volumeValueText, avatarAudioSource.volume, "0.00");
 
-            if (segmentedTtsClient == null)
+            if (realtimeTtsClient == null)
                 return;
 
-            if (transitionPaddingSlider != null)
+            if (maxChunkCharsSlider != null)
             {
-                float value = segmentedTtsClient.TransitionPaddingSeconds;
-                transitionPaddingSlider.SetValueWithoutNotify(value);
-                UpdateSliderLabel(transitionPaddingValueText, value, "0.000");
+                float value = realtimeTtsClient.MaxChunkChars;
+                maxChunkCharsSlider.SetValueWithoutNotify(value);
+                UpdateSliderLabel(maxChunkCharsValueText, value, "0");
             }
 
-            if (maxWaitNextSegmentSlider != null)
+            if (interChunksGapSlider != null)
             {
-                float value = segmentedTtsClient.MaxWaitForNextSegmentSeconds;
-                maxWaitNextSegmentSlider.SetValueWithoutNotify(value);
-                UpdateSliderLabel(maxWaitNextSegmentValueText, value, "0.00");
+                float value = realtimeTtsClient.InterChunkGapSeconds;
+                interChunksGapSlider.SetValueWithoutNotify(value);
+                UpdateSliderLabel(interChunksGapValueText, value, "0.000");
             }
-
-            if (maxSegmentCharsSlider != null)
-            {
-                float value = segmentedTtsClient.MaxSegmentChars;
-                maxSegmentCharsSlider.SetValueWithoutNotify(value);
-                UpdateSliderLabel(maxSegmentCharsValueText, value, "0");
-            }
-
-            if (logSegmentsToggle != null)
-                logSegmentsToggle.SetIsOnWithoutNotify(segmentedTtsClient.LogSegments);
         }
 
         private void RefreshTelemetrySummary()
@@ -437,6 +411,7 @@ namespace MVP.Conversation
 
         private void OnLipSyncToggleChanged(bool isOn)
         {
+            return;
             if (lipSyncBehaviour != null)
             {
                 lipSyncBehaviour.enabled = isOn;
@@ -453,15 +428,6 @@ namespace MVP.Conversation
             }
         }
 
-        private void OnLogSegmentsToggleChanged(bool isOn)
-        {
-            if (segmentedTtsClient == null)
-                return;
-
-            segmentedTtsClient.SetLogSegments(isOn);
-            AppendLocalLog($"Segment log {(isOn ? "enabled" : "disabled")}");
-        }
-
         private void OnVolumeSliderChanged(float value)
         {
             if (avatarAudioSource != null)
@@ -470,35 +436,25 @@ namespace MVP.Conversation
             UpdateSliderLabel(volumeValueText, value, "0.00");
         }
 
-        private void OnTransitionPaddingSliderChanged(float value)
+        private void OnMaxChunkCharsSliderChanged(float value)
         {
-            if (segmentedTtsClient == null)
-                return;
-
-            segmentedTtsClient.SetTransitionPaddingSeconds(value);
-            UpdateSliderLabel(transitionPaddingValueText, value, "0.000");
-            AppendLocalLog($"Transition padding -> {value:0.000}");
-        }
-
-        private void OnMaxWaitNextSegmentSliderChanged(float value)
-        {
-            if (segmentedTtsClient == null)
-                return;
-
-            segmentedTtsClient.SetMaxWaitForNextSegmentSeconds(value);
-            UpdateSliderLabel(maxWaitNextSegmentValueText, value, "0.00");
-            AppendLocalLog($"Max wait next segment -> {value:0.00}");
-        }
-
-        private void OnMaxSegmentCharsSliderChanged(float value)
-        {
-            if (segmentedTtsClient == null)
+            if (realtimeTtsClient == null)
                 return;
 
             int intValue = Mathf.RoundToInt(value);
-            segmentedTtsClient.SetMaxSegmentChars(intValue);
-            UpdateSliderLabel(maxSegmentCharsValueText, intValue, "0");
-            AppendLocalLog($"Max segment chars -> {intValue}");
+            realtimeTtsClient.MaxChunkChars = intValue;
+            UpdateSliderLabel(maxChunkCharsValueText, intValue, "0");
+            AppendLocalLog($"Max chunk chars -> {intValue}");
+        }
+
+        private void OnInterChunksGapSliderChanged(float value)
+        {
+            if (realtimeTtsClient == null)
+                return;
+
+            realtimeTtsClient.InterChunkGapSeconds = value;
+            UpdateSliderLabel(interChunksGapValueText, value, "0.000");
+            AppendLocalLog($"Inter-chunk gap -> {value:0.000}");
         }
 
         private void OnNewUserClicked()
