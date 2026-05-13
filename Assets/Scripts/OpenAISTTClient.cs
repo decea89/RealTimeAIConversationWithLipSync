@@ -37,6 +37,11 @@ namespace MVP.Conversation
         [Tooltip("Timeout STT (s). Audio largo tarda más. Aumentar si hay timeout en grabaciones largas.")]
         private int requestTimeoutSeconds = 90;
 
+        [Header("Debug")]
+        [SerializeField]
+        [Tooltip("Mostrar logs detallados de la petición STT. Dejar apagado para pruebas normales.")]
+        private bool logRequestDetails = false;
+
         public IEnumerator Transcribe(byte[] audioBytes, Action<string, string> onComplete)
         {
             if (audioBytes == null || audioBytes.Length == 0)
@@ -46,8 +51,11 @@ namespace MVP.Conversation
             }
 
 
-            Debug.Log($"[OpenAISTTClient] Preparing STT request. bytes={audioBytes.Length}, model={model}, responseFormat={responseFormat}, language={language}");
-            Debug.Log($"[OpenAISTTClient] WAV header preview: {GetHexPreview(audioBytes, 32)}");
+            if (logRequestDetails)
+            {
+                Debug.Log($"[OpenAISTTClient] Preparing STT request. bytes={audioBytes.Length}, model={model}, responseFormat={responseFormat}, language={language}");
+                Debug.Log($"[OpenAISTTClient] WAV header preview: {GetHexPreview(audioBytes, 32)}");
+            }
 
             string boundary = "----UnityOpenAIBoundary" + DateTime.UtcNow.Ticks.ToString("x");
             byte[] body = BuildMultipartBody(boundary, audioBytes, model, responseFormat, language);
@@ -63,24 +71,30 @@ namespace MVP.Conversation
             request.SetRequestHeader("Content-Type", $"multipart/form-data; boundary={boundary}");
             request.SetRequestHeader("Accept", "application/json");
 
-            Debug.Log($"[OpenAISTTClient] Multipart body bytes={body.Length}");
-            Debug.Log($"[OpenAISTTClient] Content-Type=multipart/form-data; boundary={boundary}");
+            if (logRequestDetails)
+            {
+                Debug.Log($"[OpenAISTTClient] Multipart body bytes={body.Length}");
+                Debug.Log($"[OpenAISTTClient] Content-Type=multipart/form-data; boundary={boundary}");
+            }
 
             yield return request.SendWebRequest();
 
             string raw = request.downloadHandler?.text;
             byte[] rawBytes = request.downloadHandler?.data;
 
-            Debug.Log("[OpenAISTTClient] VERSION_MARKER_MANUAL_MULTIPART_V2");
-            Debug.Log($"[OpenAISTTClient] STT START bytes={audioBytes.Length} wav={GetHexPreview(audioBytes, 16)}");
-            Debug.Log($"[OpenAISTTClient] STT END code={request.responseCode} result={request.result} rawBytes={(rawBytes == null ? -1 : rawBytes.Length)} raw='{raw}'");
+            if (logRequestDetails)
+            {
+                Debug.Log("[OpenAISTTClient] VERSION_MARKER_MANUAL_MULTIPART_V2");
+                Debug.Log($"[OpenAISTTClient] STT START bytes={audioBytes.Length} wav={GetHexPreview(audioBytes, 16)}");
+                Debug.Log($"[OpenAISTTClient] STT END code={request.responseCode} result={request.result} rawBytes={(rawBytes == null ? -1 : rawBytes.Length)} raw='{raw}'");
 
-            Debug.Log($"[OpenAISTTClient] result={request.result}, code={request.responseCode}, error={request.error ?? "null"}");
-            Debug.Log($"[OpenAISTTClient] RAW bytes len={(rawBytes == null ? -1 : rawBytes.Length)}");
-            Debug.Log($"[OpenAISTTClient] RAW STT: '{raw}'");
+                Debug.Log($"[OpenAISTTClient] result={request.result}, code={request.responseCode}, error={request.error ?? "null"}");
+                Debug.Log($"[OpenAISTTClient] RAW bytes len={(rawBytes == null ? -1 : rawBytes.Length)}");
+                Debug.Log($"[OpenAISTTClient] RAW STT: '{raw}'");
+            }
 
             var headers = request.GetResponseHeaders();
-            if (headers != null)
+            if (logRequestDetails && headers != null)
             {
                 foreach (var kv in headers)
                     Debug.Log($"[OpenAISTTClient] Header {kv.Key}: {kv.Value}");
@@ -103,7 +117,8 @@ namespace MVP.Conversation
                 if (responseFormat == "text")
                 {
                     string plainText = raw.Trim();
-                    Debug.Log($"[OpenAISTTClient] Parsed text length={plainText.Length}");
+                    if (logRequestDetails)
+                        Debug.Log($"[OpenAISTTClient] Parsed text length={plainText.Length}");
                     onComplete?.Invoke(plainText, null);
                     yield break;
                 }
@@ -111,7 +126,8 @@ namespace MVP.Conversation
                 var parsed = JsonConvert.DeserializeObject<TranscriptionResponse>(raw);
                 string parsedText = parsed?.text?.Trim();
 
-                Debug.Log($"[OpenAISTTClient] Parsed json text length={(parsedText == null ? -1 : parsedText.Length)}");
+                if (logRequestDetails)
+                    Debug.Log($"[OpenAISTTClient] Parsed json text length={(parsedText == null ? -1 : parsedText.Length)}");
 
                 if (string.IsNullOrWhiteSpace(parsedText))
                 {

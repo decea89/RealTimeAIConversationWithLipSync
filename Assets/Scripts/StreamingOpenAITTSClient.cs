@@ -33,6 +33,12 @@ namespace MVP.Conversation
         private string instructions =
             "Speak in warm, natural Spanish, with clear diction and a conversational tone suitable for a historical character in VR.";
 
+        [Header("Voice Tuning")]
+        [SerializeField]
+        [Range(0.25f, 4.0f)]
+        [Tooltip("Velocidad de voz. 0.5=lento y profundo. 1.0=normal. 2.0=rápido y agudo.")]
+        private float speed = 1.0f;
+
         [Header("PCM Stream Config")]
         [SerializeField]
         [Range(16000, 48000)]
@@ -47,6 +53,11 @@ namespace MVP.Conversation
         [Range(10, 120)]
         [Tooltip("Duración max audio (s). Más alto=buffer seguro para respuestas largas.")]
         private int maxClipSeconds = 60;
+
+        [SerializeField]
+        [Range(5, 180)]
+        [Tooltip("Timeout de la petición TTS (s). Súbelo si respuestas largas empiezan a cortar o fallar después de iniciar el audio; bájalo solo si quieres abortar antes.")]
+        private int requestTimeoutSeconds = 90;
         
         [SerializeField]
         [Range(0.05f, 2.0f)]
@@ -66,15 +77,15 @@ namespace MVP.Conversation
         [Header("Diagnostics")]
         [SerializeField]
         [Tooltip("Capturar PCM para crear clip debug. Útil para auditar calidad.")]
-        private bool captureFullPcmForDebug = true;
+        private bool captureFullPcmForDebug = false;
         
         [SerializeField]
         [Tooltip("Mostrar duración esperada del audio en logs.")]
-        private bool logExpectedDuration = true;
+        private bool logExpectedDuration = false;
         
         [SerializeField]
         [Tooltip("Crear AudioClip debug al terminar. Acumula memoria en sesiones largas.")]
-        private bool buildDebugClipOnComplete = true;
+        private bool buildDebugClipOnComplete = false;
 
         private StreamingAudioBuffer audioBuffer;
         // Optional external player to write samples into (shared playback path)
@@ -91,6 +102,10 @@ namespace MVP.Conversation
 
         private readonly List<byte> fullPcmCapture = new List<byte>(65536);
         private AudioClip debugCapturedClip;
+        private int activeTurnId = -1;
+        private float requestStartedAt = -1f;
+        private float firstChunkAt = -1f;
+        private bool firstChunkLogged;
 
         public AudioClip DebugCapturedClip => debugCapturedClip;
 
@@ -116,9 +131,21 @@ namespace MVP.Conversation
 
             externalPlayer = targetPlayer;
             externalPlayerGenerationId = targetPlayer.GenerationId;
+            activeTurnId = turnId;
+            requestStartedAt = Time.realtimeSinceStartup;
+            firstChunkAt = -1f;
+            firstChunkLogged = false;
 
             streamCompleted = false;
             streamFailed = false;
+
+                        if (logChunks)
+                        {
+                            Debug.Log(
+                                $"[StreamingOpenAITTSClient] STREAM START turn={turnId}, generation={externalPlayerGenerationId}, " +
+                                $"textLength={text.Length}, requestTimeout={requestTimeoutSeconds}s, speed={speed:0.00}, " +
+                                $"sampleRate={sampleRate}, channels={channels}");
+                        }
             streamErrorMessage = null;
             Interlocked.Exchange(ref totalBytesReceived, 0);
             Interlocked.Exchange(ref audioReadCallCount, 0);
@@ -134,6 +161,7 @@ namespace MVP.Conversation
                 input = text,
                 voice = voice,
                 instructions = instructions,
+                speed = speed,
                 response_format = "pcm"
             };
 
@@ -144,12 +172,20 @@ namespace MVP.Conversation
             {
                 request.uploadHandler = new UploadHandlerRaw(bodyRaw);
                 request.downloadHandler = downloadHandler;
-                request.timeout = 60; // Increased timeout for long responses
+                request.timeout = Mathf.Max(5, requestTimeoutSeconds);
                 request.disposeDownloadHandlerOnDispose = true;
                 request.SetRequestHeader("Content-Type", "application/json");
                 request.SetRequestHeader("Authorization", $"Bearer {apiKey}");
 
                 yield return request.SendWebRequest();
+
+                if (logChunks)
+                {
+                    float requestElapsed = Time.realtimeSinceStartup - requestStartedAt;
+                    Debug.Log(
+                        $"[StreamingOpenAITTSClient] STREAM REQUEST DONE turn={turnId}, result={request.result}, " +
+                        $"code={request.responseCode}, elapsed={requestElapsed:F2}s, error={request.error ?? "null"}");
+                }
 
                 if (request.result != UnityWebRequest.Result.Success)
                 {
@@ -162,12 +198,15 @@ namespace MVP.Conversation
                 }
             }
 
-            // Wait for audio to finish playback
+            // Wait for the network stream to end and for the player to fully drain.
             float waitTimeout = maxClipSeconds + 5f;
             float waitElapsed = 0f;
-            while (!streamCompleted && waitElapsed < waitTimeout)
+            while (waitElapsed < waitTimeout)
             {
-                if (targetPlayer.IsPlaybackFinished)
+                if (streamFailed)
+                    break;
+
+                if (streamCompleted && targetPlayer.IsPlaybackFinished)
                 {
                     if (logChunks)
                         Debug.Log("[StreamingOpenAITTSClient] Playback finished.");
@@ -176,6 +215,14 @@ namespace MVP.Conversation
 
                 waitElapsed += Time.deltaTime;
                 yield return null;
+            }
+
+            if (waitElapsed >= waitTimeout && logChunks)
+            {
+                Debug.LogWarning(
+                    $"[StreamingOpenAITTSClient] Playback wait timeout turn={turnId}, " +
+                    $"streamCompleted={streamCompleted}, playerFinished={targetPlayer.IsPlaybackFinished}, " +
+                    $"availableSamples={targetPlayer.AvailableSamples}");
             }
 
             FinalizeDiagnostics();
@@ -194,6 +241,7 @@ namespace MVP.Conversation
             if (string.IsNullOrWhiteSpace(text))
             {
                 onError?.Invoke("StreamingOpenAITTSClient: text vacío.");
+                activeTurnId = -1;
                 yield break;
             }
 
@@ -252,6 +300,7 @@ namespace MVP.Conversation
                 input = text,
                 voice = voice,
                 instructions = instructions,
+                speed = speed,
                 response_format = "pcm"
             };
 
@@ -423,6 +472,20 @@ namespace MVP.Conversation
             {
                 for (int i = 0; i < dataLength; i++)
                     fullPcmCapture.Add(data[i]);
+            }
+
+            if (!firstChunkLogged)
+            {
+                firstChunkLogged = true;
+                firstChunkAt = Time.realtimeSinceStartup;
+
+                if (logChunks)
+                {
+                    Debug.Log(
+                        $"[StreamingOpenAITTSClient] FIRST PCM CHUNK turn={activeTurnId}, " +
+                        $"elapsed={(firstChunkAt - requestStartedAt):F2}s, bytes={dataLength}, " +
+                        $"generation={(externalPlayer != null ? externalPlayer.GenerationId : -1)}");
+                }
             }
 
             int totalBytesToProcess = dataLength + (hasPendingOddByte ? 1 : 0);
@@ -683,6 +746,7 @@ namespace MVP.Conversation
                 input = text,
                 voice = voice,
                 instructions = instructions,
+                speed = speed,
                 response_format = "pcm"
             };
 
@@ -794,6 +858,14 @@ namespace MVP.Conversation
             FinalizeDiagnostics();
 
             externalPlayer = null;
+            if (logChunks)
+            {
+                float totalElapsed = Time.realtimeSinceStartup - requestStartedAt;
+                Debug.Log(
+                    $"[StreamingOpenAITTSClient] STREAM END turn={activeTurnId}, totalElapsed={totalElapsed:F2}s, " +
+                    $"firstChunkAt={(firstChunkAt >= 0f ? firstChunkAt - requestStartedAt : -1f):F2}s");
+            }
+            activeTurnId = -1;
             onCompleted?.Invoke();
         }
 
@@ -806,7 +878,13 @@ namespace MVP.Conversation
                 externalPlayer.MarkStreamingComplete(externalPlayerGenerationId);
             }
             
-            Debug.Log("[StreamingOpenAITTSClient] Stream COMPLETED");
+            if (logChunks)
+            {
+                Debug.Log(
+                    $"[StreamingOpenAITTSClient] Stream COMPLETED turn={activeTurnId}, " +
+                    $"bytes={Interlocked.Read(ref totalBytesReceived)}, " +
+                    $"buffered={(externalPlayer != null ? externalPlayer.AvailableSamples : -1)}");
+            }
         }
 
         private void NotifyError(string error)
@@ -822,6 +900,7 @@ namespace MVP.Conversation
             public string input;
             public string voice;
             public string instructions;
+            public float speed;
             public string response_format;
         }
 
@@ -841,6 +920,12 @@ namespace MVP.Conversation
 
                 try
                 {
+
+                    if (owner.logChunks)
+                    {
+                        Debug.Log($"[StreamingOpenAITTSClient] ReceiveData bytes={dataLength}");
+                    }
+
                     owner.AppendPcmChunk(data, dataLength);
                     return true;
                 }
