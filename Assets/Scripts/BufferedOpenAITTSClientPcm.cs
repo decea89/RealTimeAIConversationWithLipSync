@@ -9,17 +9,52 @@ namespace MVP.Conversation
     public class BufferedOpenAITTSClientPcm : MonoBehaviour, ITTSService
     {
         [Header("OpenAI TTS")]
-        [SerializeField] private string apiKey = "YOUR_OPENAI_API_KEY";
-        [SerializeField] private string endpoint = "https://api.openai.com/v1/audio/speech";
-        [SerializeField] private string model = "gpt-4o-mini-tts";
-        [SerializeField] private string voice = "echo";
-        [SerializeField] private int sampleRate = 24000;
-        [SerializeField] private int channels = 1;
+        [SerializeField]
+        [Tooltip("Tu API key de OpenAI. Mantener privado.")]
+        private string apiKey = "YOUR_OPENAI_API_KEY";
+        
+        [SerializeField]
+        [Tooltip("Endpoint de OpenAI para TTS. No cambiar a menos que uses proxy.")]
+        private string endpoint = "https://api.openai.com/v1/audio/speech";
+        
+        [SerializeField]
+        [Tooltip("Modelo TTS a usar. 'gpt-4o-mini-tts' es el default rápido.")]
+        private string model = "gpt-4o-mini-tts";
+        
+        [SerializeField]
+        [Tooltip("Voz a usar. Opciones: coral/sage/shimmer/echo/alloy. 'echo' es profesional.")]
+        private string voice = "echo";
+        
+        [SerializeField]
+        [Range(16000, 48000)]
+        [Tooltip("Frecuencia de muestreo (Hz). 24000 por defecto.")]
+        private int sampleRate = 24000;
+        
+        [SerializeField]
+        [Range(1, 2)]
+        [Tooltip("Canales (1=mono, 2=estéreo). Mantener en 1 para VR.")]
+        private int channels = 1;
 
         [Header("Voice Tuning")]
-        [SerializeField] [Range(0.25f, 4.0f)] private float speed = 1.10f;
+        [SerializeField]
+        [Range(0.25f, 4.0f)]
+        [Tooltip("Velocidad de voz. 0.5=lento y profundo. 1.0=normal. 2.0=rápido y agudo.")]
+        private float speed = 1.10f;
 
-        [SerializeField] [TextArea(2, 5)]
+        [Header("Request Guards")]
+        [SerializeField]
+        [Range(5, 180)]
+        [Tooltip("Timeout TTS (s). Aumentar si respuestas largas se cortan. 90s recomendado.")]
+        private int requestTimeoutSeconds = 45;
+        
+        [SerializeField]
+        [Range(40, 2000)]
+        [Tooltip("Máximo de caracteres por solicitud TTS. Límite de OpenAI: ~4000. Limitar para latencia.")]
+        private int maxInputChars = 500;
+
+        [SerializeField]
+        [TextArea(2, 5)]
+        [Tooltip("Instrucciones al modelo sobre cómo sonar. Afecta acento, velocidad, emociones.")]
         private string instructions =
             "Speak in Spanish from Spain with a natural Castilian accent. " +
             "Use a fluid, confident, conversational delivery with shorter pauses. " +
@@ -33,10 +68,17 @@ namespace MVP.Conversation
                 yield break;
             }
 
+            string trimmedText = text.Trim();
+            if (trimmedText.Length > maxInputChars)
+            {
+                Debug.LogWarning($"[BufferedOpenAITTSClientPcm] input recortado de {trimmedText.Length} a {maxInputChars} chars para limitar latencia.");
+                trimmedText = trimmedText.Substring(0, maxInputChars);
+            }
+
             var body = new OpenAITtsRequest
             {
                 model = model,
-                input = text,
+                input = trimmedText,
                 voice = voice,
                 instructions = instructions,
                 response_format = "pcm",
@@ -49,6 +91,7 @@ namespace MVP.Conversation
             using var request = new UnityWebRequest(endpoint, UnityWebRequest.kHttpVerbPOST);
             request.uploadHandler = new UploadHandlerRaw(bodyRaw);
             request.downloadHandler = new DownloadHandlerBuffer();
+            request.timeout = Mathf.Max(5, requestTimeoutSeconds);
             request.SetRequestHeader("Content-Type", "application/json");
             request.SetRequestHeader("Authorization", $"Bearer {apiKey}");
 

@@ -12,25 +12,68 @@ namespace MVP.Conversation
     public class OpenAIConversationController : MonoBehaviour
     {
         [Header("Dependencies")]
-        [SerializeField] private MonoBehaviour chatServiceBehaviour;
-        [SerializeField] private MonoBehaviour sttServiceBehaviour;
-        [SerializeField] private MonoBehaviour realtimeTtsServiceBehaviour;
-        [SerializeField] private MicrophoneRecorder microphoneRecorder;
-        [SerializeField] private AudioSource avatarAudioSource;
-        [SerializeField] private AvatarEmotionController emotionController;
-        [SerializeField] private WorldSpaceDebugPanelController worldSpaceDebugPanel;
+        [SerializeField]
+        [Tooltip("Componente con IChatService (OpenAIChatClient). Genera respuestas de IA.")]
+        private MonoBehaviour chatServiceBehaviour;
+        
+        [SerializeField]
+        [Tooltip("Componente con ISTTService (OpenAISTTClient). Transcribe audio del usuario.")]
+        private MonoBehaviour sttServiceBehaviour;
+        
+        [SerializeField]
+        [Tooltip("Componente con IRealtimeTTSService (RealtimeOpenAITTSClient). Convierte respuesta a audio streaming.")]
+        private MonoBehaviour realtimeTtsServiceBehaviour;
+        
+        [SerializeField]
+        [Tooltip("Componente MicrophoneRecorder. Captura audio del usuario.")]
+        private MicrophoneRecorder microphoneRecorder;
+        
+        [SerializeField]
+        [Tooltip("AudioSource para reproducción. Se reutiliza para todas las respuestas.")]
+        private AudioSource avatarAudioSource;
+        
+        [SerializeField]
+        [Tooltip("Componente AvatarEmotionController (opcional). Sincroniza emociones con audio.")]
+        private AvatarEmotionController emotionController;
+        
+        [SerializeField]
+        [Tooltip("Panel de debug en mundo. Muestra logs y timing de conversación.")]
+        private WorldSpaceDebugPanelController worldSpaceDebugPanel;
 
         [Header("Push To Talk")]
-        [SerializeField] private bool useKeyboardDebugShortcut = true;
-        [SerializeField] private KeyCode keyboardDebugKey = KeyCode.Space;
-        [SerializeField] private bool useXriPushToTalk = true;
-        [SerializeField] private InputActionReference pushToTalkAction;
-        [SerializeField] private float minimumHoldSeconds = 0.12f;
-        [SerializeField] private bool allowBargeInWhileSpeaking = true;
+        [SerializeField]
+        [Tooltip("Habilitar PTT con tecla de teclado (Space por defecto). Útil para testing.")]
+        private bool useKeyboardDebugShortcut = true;
+        
+        [SerializeField]
+        [Tooltip("Tecla para activar PTT (Space=micrófono, Tab=opción B, etc).")]
+        private KeyCode keyboardDebugKey = KeyCode.Space;
+        
+        [SerializeField]
+        [Tooltip("Habilitar PTT con XRI (mando VR). Requiere InputSystem.")]
+        private bool useXriPushToTalk = true;
+        
+        [SerializeField]
+        [Tooltip("Acción de Input para PTT VR. Mapear en InputSystem.")]
+        private InputActionReference pushToTalkAction;
+        
+        [SerializeField]
+        [Range(0.01f, 1.0f)]
+        [Tooltip("Duración mínima para registrar como PTT (s). Evita activaciones accidentales.")]
+        private float minimumHoldSeconds = 0.12f;
+        
+        [SerializeField]
+        [Tooltip("Permitir interrumpir audio de IA durante reproducción. Si OFF, espera a que termine.")]
+        private bool allowBargeInWhileSpeaking = true;
 
         [Header("Debug Output")]
-        [SerializeField] private bool includeAssistantTextInMetrics = true;
-        [SerializeField] private bool includeSourcesInBackendInfo = true;
+        [SerializeField]
+        [Tooltip("Incluir texto de IA en métricas de timing. Útil para debugging.")]
+        private bool includeAssistantTextInMetrics = true;
+        
+        [SerializeField]
+        [Tooltip("Incluir fuentes/backends en info. Muestra qué servicios se usaron.")]
+        private bool includeSourcesInBackendInfo = true;
 
         private IChatService chatService;
         private ISTTService sttService;
@@ -503,10 +546,12 @@ namespace MVP.Conversation
                 yield break;
             }
 
-            float safetyTimeout = 60f;
-            float endTime = Time.time + safetyTimeout;
+            float safetyTimeout = 120f;
+            float endTime = Time.realtimeSinceStartup + safetyTimeout;
 
-            while (!handle.IsCompleted && Time.time < endTime)
+            // Solo esperamos a que termine la PRODUCCIÓN de audio (enqueue),
+            // no a que se drene todo el buffer.
+            while (!handle.IsCompleted && Time.realtimeSinceStartup < endTime)
             {
                 if (!IsTurnCurrent(turnId))
                     yield break;
@@ -516,6 +561,16 @@ namespace MVP.Conversation
 
             if (!IsTurnCurrent(turnId))
                 yield break;
+
+            if (!handle.IsCompleted)
+            {
+                realtimeTtsService.CancelAll();
+                result.error = $"Timeout en TTS realtime tras {safetyTimeout:F0}s.";
+                isAssistantSpeaking = false;
+                UpdatePanelState("Error");
+                UpdatePanelBackendInfo(result.error);
+                yield break;
+            }
 
             isAssistantSpeaking = false;
 
@@ -527,6 +582,7 @@ namespace MVP.Conversation
                 yield break;
             }
 
+            // PlaybackEnd se entiende aquí como "hemos terminado este turno de TTS"
             result.timing.MarkPlaybackEnd();
             worldSpaceDebugPanel?.AppendTelemetryEvent($"Realtime playback completed turn={turnId}");
         }

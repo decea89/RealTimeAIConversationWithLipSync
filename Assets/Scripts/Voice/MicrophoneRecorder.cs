@@ -6,12 +6,32 @@ namespace MVP.Conversation
     public class MicrophoneRecorder : MonoBehaviour
     {
         [Header("Microphone")]
-        [SerializeField] private string selectedDevice;
-        [SerializeField] private int sampleRate = 48000;
-        [SerializeField] private int maxLengthSeconds = 10;
-        [SerializeField] private bool loopRecording = false;
-        [SerializeField] private bool logDiagnostics = true;
-        [SerializeField] private float minRecordedSeconds = 0.08f;
+        [SerializeField]
+        [Tooltip("Micrófono seleccionado. Si vacío, usa el default.")]
+        private string selectedDevice;
+        
+        [SerializeField]
+        [Range(16000, 48000)]
+        [Tooltip("Frecuencia de grabación. Más alto=mejor calidad pero más datos. 48000=CD quality.")]
+        private int sampleRate = 48000;
+        
+        [SerializeField]
+        [Range(5, 60)]
+        [Tooltip("Duración máxima de grabación (s). Útil para evitar grabar todo accidentalmente.")]
+        private int maxLengthSeconds = 10;
+        
+        [SerializeField]
+        [Tooltip("Loop recording. Usualmente OFF para PTT.")]
+        private bool loopRecording = false;
+        
+        [SerializeField]
+        [Tooltip("Mostrar logs de grabación en consola. Útil para debugging.")]
+        private bool logDiagnostics = true;
+        
+        [SerializeField]
+        [Range(0.01f, 1.0f)]
+        [Tooltip("Duración mínima para considerar grabación válida (s). Evita acciones accidentales.")]
+        private float minRecordedSeconds = 0.08f;
 
         public bool IsRecording { get; private set; }
         public AudioClip CurrentClip { get; private set; }

@@ -11,11 +11,31 @@ namespace MVP.Conversation
     public class OpenAISTTClient : MonoBehaviour, ISTTService
     {
         [Header("OpenAI STT")]
-        [SerializeField] private string apiKey = "YOUR_OPENAI_API_KEY";
-        [SerializeField] private string endpoint = "https://api.openai.com/v1/audio/transcriptions";
-        [SerializeField] private string model = "gpt-4o-mini-transcribe";
-        [SerializeField] private string responseFormat = "json";
-        [SerializeField] private string language = "es";
+        [SerializeField]
+        [Tooltip("Tu API key de OpenAI. Mantener privado.")]
+        private string apiKey = "YOUR_OPENAI_API_KEY";
+        
+        [SerializeField]
+        [Tooltip("Endpoint de OpenAI para transcripción. No cambiar a menos que uses proxy.")]
+        private string endpoint = "https://api.openai.com/v1/audio/transcriptions";
+        
+        [SerializeField]
+        [Tooltip("Modelo STT a usar. 'gpt-4o-mini-transcribe' es rápido y preciso.")]
+        private string model = "gpt-4o-mini-transcribe";
+        
+        [SerializeField]
+        [Tooltip("Formato respuesta. 'json' = solo texto. 'verbose_json' = con timestamps.")]
+        private string responseFormat = "json";
+        
+        [SerializeField]
+        [Tooltip("Idioma de entrada (es=español, en=inglés). Mejora precisión.")]
+        private string language = "es";
+        
+        [Header("Request Guards")]
+        [SerializeField]
+        [Range(5, 180)]
+        [Tooltip("Timeout STT (s). Audio largo tarda más. Aumentar si hay timeout en grabaciones largas.")]
+        private int requestTimeoutSeconds = 90;
 
         public IEnumerator Transcribe(byte[] audioBytes, Action<string, string> onComplete)
         {
@@ -35,6 +55,7 @@ namespace MVP.Conversation
             using var request = new UnityWebRequest(endpoint, UnityWebRequest.kHttpVerbPOST);
             request.uploadHandler = new UploadHandlerRaw(body);
             request.downloadHandler = new DownloadHandlerBuffer();
+            request.timeout = Mathf.Max(5, requestTimeoutSeconds);
             request.disposeUploadHandlerOnDispose = true;
             request.disposeDownloadHandlerOnDispose = true;
 

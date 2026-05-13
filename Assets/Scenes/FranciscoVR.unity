@@ -2793,6 +2793,10 @@ PrefabInstance:
       propertyPath: m_Name
       value: ModeloFrancisco
       objectReference: {fileID: 0}
+    - target: {fileID: 919132149155446097, guid: b3d47b898e329f34080301993365b6cd, type: 3}
+      propertyPath: m_IsActive
+      value: 0
+      objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
@@ -3357,13 +3361,18 @@ MonoBehaviour:
   m_GameObject: {fileID: 1495054822}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 894af6ebe9223dc44860a8003e8f5bab, type: 3}
+  m_Script: {fileID: 11500000, guid: 72d65e3b638233c4a887d8169d9ef31c, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::MVP.Conversation.RealtimeOpenAITTSClient
-  innerTtsServiceBehaviour: {fileID: 3431682967973185271}
+  innerTtsServiceBehaviour: {fileID: 4390697800605530062}
   realtimeAudioPlayer: {fileID: 9206487418811563760}
-  maxChunkChars: 90
-  interChunkGapSeconds: 0.08
+  streamingAudioSource: {fileID: 4032331762414432206}
+  maxChunkChars: 30
+  interChunkGapSeconds: 0.07
+  verboseLogging: 1
+  enableTelemetry: 1
+  enqueueStallTimeoutSeconds: 8
+  chunkCrossfadeMs: 35
 --- !u!1001 &1519520462
 PrefabInstance:
   m_ObjectHideFlags: 0
@@ -4392,6 +4401,53 @@ MeshFilter:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1959883322}
   m_Mesh: {fileID: 10202, guid: 0000000000000000e000000000000000, type: 0}
+--- !u!1 &2047814914
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 2047814916}
+  - component: {fileID: 2047814915}
+  m_Layer: 0
+  m_Name: Fixer
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 0
+--- !u!114 &2047814915
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2047814914}
+  m_Enabled: 0
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: b56bb9158d3140045bc5899cd7c54f4a, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::NewMonoBehaviourScript
+  innerTtsServiceBehaviour: {fileID: 3431682967973185271}
+  targetAudioSource: {fileID: 4032331762414432206}
+  maxPlaybackSeconds: 60
+--- !u!4 &2047814916
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2047814914}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 6509928022762900343}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &3887984515068350
 GameObject:
   m_ObjectHideFlags: 0
@@ -4408,7 +4464,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 1
+  m_IsActive: 0
 --- !u!114 &5452662228809518
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -9939,7 +9995,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 1
+  m_IsActive: 0
 --- !u!1 &2927739733984211521
 GameObject:
   m_ObjectHideFlags: 0
@@ -10327,7 +10383,7 @@ MonoBehaviour:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 3887984515068350}
-  m_Enabled: 1
+  m_Enabled: 0
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: db1f81cd3319ecf4ab39d807d4f4cad2, type: 3}
   m_Name: 
@@ -10339,6 +10395,8 @@ MonoBehaviour:
   sampleRate: 24000
   channels: 1
   speed: 1.25
+  requestTimeoutSeconds: 45
+  maxInputChars: 500
   instructions: "Habla en espa\xF1ol de Espa\xF1a, castellano peninsular, con pronunciaci\xF3n
     natural de Castilla y Le\xF3n. Llevo un ritmo r\xE1pido y fluido y con pausas
     cortas.\r\nEvita acento latinoamericano, evita voseo y evita seseo hispanoamericano.\r\nTono
@@ -10351,7 +10409,7 @@ MonoBehaviour:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 6764782050186674919}
-  m_Enabled: 1
+  m_Enabled: 0
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 722774edb04457847992b1d1cb43e1b6, type: 3}
   m_Name: 
@@ -10496,7 +10554,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 1
+  m_IsActive: 0
 --- !u!224 &3669208653220449940
 RectTransform:
   m_ObjectHideFlags: 0
@@ -11842,7 +11900,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Oculus.LipSync::OVRLipSyncContextMorphTarget
   skinnedMeshRenderer: {fileID: 1057209825567806926}
   visemeToBlendTargets: 00000000140000000700000017000000040000000b000000030000001600000010000000150000000100000005000000080000001100000012000000
-  enableVisemeTestKeys: 1
+  enableVisemeTestKeys: 0
   visemeTestKeys: 600000000900000071000000770000006500000072000000740000007900000075000000690000006f000000700000005b0000005d0000005c000000
   laughterKey: 301
   laughterBlendTarget: 15
@@ -12139,7 +12197,6 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 6509928022762900343}
-  - component: {fileID: 5228763324744204423}
   - component: {fileID: 4962318199887468802}
   - component: {fileID: 8961722755474951144}
   - component: {fileID: 478939891519281301}
@@ -12245,7 +12302,7 @@ MonoBehaviour:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 894496406878085584}
-  m_Enabled: 0
+  m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: c2e88891ee7c9bb499cdc9030df01f09, type: 3}
   m_Name: 
@@ -12254,13 +12311,16 @@ MonoBehaviour:
   endpoint: https://api.openai.com/v1/audio/speech
   model: gpt-4o-mini-tts
   voice: echo
-  instructions: Speak in a warm, natural, conversational tone suitable for a VR character.
-    Keep the pacing clear and slightly expressive.
+  instructions: "Habla en espa\xF1ol de Espa\xF1a, castellano peninsular, con pronunciaci\xF3n
+    natural de Castilla y Le\xF3n. Llevo un ritmo r\xE1pido y fluido y con pausas
+    cortas.\r\nEvita acento latinoamericano, evita voseo y evita seseo hispanoamericano.\r\nTono
+    culto, propio de un personaje hist\xF3rico espa\xF1ol. Respuestas cortas: 1-2
+    frases cortas. "
   sampleRate: 24000
   channels: 1
   maxClipSeconds: 60
   prebufferSeconds: 0.35
-  drainGraceSeconds: 0.4
+  drainGraceSeconds: 2
   logChunks: 1
   captureFullPcmForDebug: 1
   logExpectedDuration: 1
@@ -15800,6 +15860,7 @@ MonoBehaviour:
   apiKey: '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 '
   endpoint: https://api.openai.com/v1/chat/completions
   model: gpt-4.1-nano
+  requestTimeoutSeconds: 45
   systemPrompt: "You are Francisco de Vitoria, a historical character in a VR experience.
     \r\nAnswer briefly, clearly, with personality, and under 60 words unless asked
     otherwise. Give short answers: 1-2 short sentences. Always answer in Spanish
@@ -16099,26 +16160,6 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 9085046f02f69544eb97fd06b6048fe2, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
---- !u!114 &5228763324744204423
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 4049526484040864922}
-  m_Enabled: 0
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 3aa39b8dfccd2ee4a917ceee19d7a4b6, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::OpenAITTSClient
-  apiKey: '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 '
-  endpoint: https://api.openai.com/v1/audio/speech
-  model: gpt-4o-mini-tts
-  voice: echo
-  instructions: Speak in a warm, natural, conversational tone suitable for a VR character.
-    Keep the pacing clear and slightly expressive.
-  responseFormat: mp3
-  speed: 1.1
 --- !u!4 &5256090443311197440
 Transform:
   m_ObjectHideFlags: 0
@@ -19210,6 +19251,7 @@ Transform:
   - {fileID: 8526676920109325393}
   - {fileID: 2247668078567943131}
   - {fileID: 1495054823}
+  - {fileID: 2047814916}
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &6642858948686634561
@@ -19272,7 +19314,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 1
+  m_IsActive: 0
 --- !u!23 &6820329522959115906
 MeshRenderer:
   m_ObjectHideFlags: 0
@@ -20859,7 +20901,7 @@ MonoBehaviour:
   clearLogsButton: {fileID: 6917058404344353846}
   captureUnityLogs: 1
   maxLogLines: 8
-  includeControllerHeartbeat: 0
+  includeControllerHeartbeat: 1
 --- !u!114 &8660496693523707530
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -21055,7 +21097,7 @@ MonoBehaviour:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 2858713071791873685}
-  m_Enabled: 1
+  m_Enabled: 0
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 2938b2a3ea0a5a040a7cd2974cc1c5b4, type: 3}
   m_Name: 
@@ -21198,6 +21240,7 @@ MonoBehaviour:
   model: gpt-4o-mini-transcribe
   responseFormat: json
   language: es
+  requestTimeoutSeconds: 60
 --- !u!1 &8968791489103031335
 GameObject:
   m_ObjectHideFlags: 0
@@ -21581,11 +21624,13 @@ MonoBehaviour:
   m_GameObject: {fileID: 1057209825567806928}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 9a5871d8c1322c14198bfd34d08228d4, type: 3}
+  m_Script: {fileID: 11500000, guid: dbdb2b2bcc7fc0a4e8213193ff7c33fd, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::MVP.Conversation.RealtimeAudioPlayer
-  bufferCapacitySamples: 176400
-  prebufferSamples: 1024
+  bufferCapacitySamples: 705600
+  prebufferSamples: 126
+  drainGraceSamples: 1024
+  audioSource: {fileID: 4032331762414432206}
 --- !u!1660057539 &9223372036854775807
 SceneRoots:
   m_ObjectHideFlags: 0

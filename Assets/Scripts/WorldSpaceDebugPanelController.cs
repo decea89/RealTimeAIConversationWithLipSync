@@ -11,11 +11,25 @@ namespace MVP.Conversation
     public class WorldSpaceDebugPanelController : MonoBehaviour
     {
         [Header("Core References")]
-        [SerializeField] private OpenAIConversationController conversationController;
-        [SerializeField] private AudioSource avatarAudioSource;
-        [SerializeField] private RealtimeOpenAITTSClient realtimeTtsClient;
-        [SerializeField] private MonoBehaviour lipSyncBehaviour;
-        [SerializeField] private MonoBehaviour emotionBehaviour;
+        [SerializeField]
+        [Tooltip("Controlador principal de conversación. Requiere para monitorear estado.")]
+        private OpenAIConversationController conversationController;
+        
+        [SerializeField]
+        [Tooltip("AudioSource del avatar. Para control de volumen.")]
+        private AudioSource avatarAudioSource;
+        
+        [SerializeField]
+        [Tooltip("Cliente TTS realtime. Para monitorear tiempos y streaming.")]
+        private RealtimeOpenAITTSClient realtimeTtsClient;
+        
+        [SerializeField]
+        [Tooltip("Comportamiento de LipSync (OVRLipSyncContext). Opcional para sincronizar movimientos.")]
+        private MonoBehaviour lipSyncBehaviour;
+        
+        [SerializeField]
+        [Tooltip("Controlador de emociones. Opcional para sincronizar expresiones.")]
+        private MonoBehaviour emotionBehaviour;
 
         [Header("Text UI")]
         [SerializeField] private TMP_Text stateText;
