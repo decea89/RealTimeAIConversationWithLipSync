@@ -12,9 +12,14 @@ namespace MVP.Conversation
         private int bufferCapacitySamples = 48000 * 16; // ~16s mono a 48kHz
         
         [SerializeField]
-        [Range(512, 8192)]
+        [Range(512, 16384)]
         [Tooltip("Buffer mínimo antes de reproducir (samples). Más alto=más seguro pero latencia inicial. 2048=~42ms delay.")]
         private int prebufferSamples = 2048;
+        
+        [SerializeField]
+        [Range(0, 16384)]
+        [Tooltip("Muestras extra de margen de seguridad antes de considerar que el audio ha comenzado. Ajusta para absorber pequeñas pausas al inicio.")]
+        private int startSafetySamples = 2048;
         
         [SerializeField]
         [Range(256, 4096)]
@@ -200,14 +205,16 @@ namespace MVP.Conversation
             if (scratchMono == null || scratchMono.Length < frames)
                 scratchMono = new float[frames];
 
-            if (!audioStarted && buffer.AvailableSamples >= prebufferSamples)
+            int startThreshold = prebufferSamples + startSafetySamples;
+            if (!audioStarted && buffer.AvailableSamples >= startThreshold)
             {
                 audioStarted = true;
                 pendingAudioBegan = true;
 
                 Debug.Log(
                     $"[RealtimeAudioPlayer] Audio started generation={generationId}, " +
-                    $"available={buffer.AvailableSamples}, prebufferSamples={prebufferSamples}");
+                    $"available={buffer.AvailableSamples}, prebuffer={prebufferSamples}, " +
+                    $"safety={startSafetySamples}, threshold={startThreshold}");
             }
 
             Array.Clear(scratchMono, 0, frames);
