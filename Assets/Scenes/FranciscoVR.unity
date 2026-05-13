@@ -3367,12 +3367,12 @@ MonoBehaviour:
   innerTtsServiceBehaviour: {fileID: 4390697800605530062}
   realtimeAudioPlayer: {fileID: 9206487418811563760}
   streamingAudioSource: {fileID: 4032331762414432206}
-  maxChunkChars: 30
-  interChunkGapSeconds: 0.07
+  maxChunkChars: 40
+  interChunkGapSeconds: 0.05
   verboseLogging: 1
   enableTelemetry: 1
-  enqueueStallTimeoutSeconds: 8
-  chunkCrossfadeMs: 35
+  enqueueStallTimeoutSeconds: 15
+  chunkCrossfadeMs: 60
 --- !u!1001 &1519520462
 PrefabInstance:
   m_ObjectHideFlags: 0
@@ -4401,70 +4401,6 @@ MeshFilter:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1959883322}
   m_Mesh: {fileID: 10202, guid: 0000000000000000e000000000000000, type: 0}
---- !u!1 &2047814914
-GameObject:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  serializedVersion: 6
-  m_Component:
-  - component: {fileID: 2047814916}
-  - component: {fileID: 2047814915}
-  m_Layer: 0
-  m_Name: Fixer
-  m_TagString: Untagged
-  m_Icon: {fileID: 0}
-  m_NavMeshLayer: 0
-  m_StaticEditorFlags: 0
-  m_IsActive: 0
---- !u!114 &2047814915
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 2047814914}
-  m_Enabled: 0
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: b56bb9158d3140045bc5899cd7c54f4a, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::NewMonoBehaviourScript
-  innerTtsServiceBehaviour: {fileID: 3431682967973185271}
-  targetAudioSource: {fileID: 4032331762414432206}
-  maxPlaybackSeconds: 60
---- !u!4 &2047814916
-Transform:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 2047814914}
-  serializedVersion: 2
-  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0, y: 0, z: 0}
-  m_LocalScale: {x: 1, y: 1, z: 1}
-  m_ConstrainProportionsScale: 0
-  m_Children: []
-  m_Father: {fileID: 6509928022762900343}
-  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!1 &3887984515068350
-GameObject:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  serializedVersion: 6
-  m_Component:
-  - component: {fileID: 8526676920109325393}
-  - component: {fileID: 3431682967973185271}
-  m_Layer: 0
-  m_Name: BufferedTTSPmc
-  m_TagString: Untagged
-  m_Icon: {fileID: 0}
-  m_NavMeshLayer: 0
-  m_StaticEditorFlags: 0
-  m_IsActive: 0
 --- !u!114 &5452662228809518
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -5156,7 +5092,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::MVP.Conversation.MicrophoneRecorder
   selectedDevice: 
   sampleRate: 24000
-  maxLengthSeconds: 5
+  maxLengthSeconds: 30
   loopRecording: 0
   logDiagnostics: 1
   minRecordedSeconds: 0.08
@@ -8278,21 +8214,6 @@ RectTransform:
   m_AnchoredPosition: {x: -0.000011444092, y: -62.000057}
   m_SizeDelta: {x: 200, y: 50}
   m_Pivot: {x: 0.5, y: 1}
---- !u!4 &2247668078567943131
-Transform:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 2858713071791873685}
-  serializedVersion: 2
-  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0, y: 0, z: 0}
-  m_LocalScale: {x: 1, y: 1, z: 1}
-  m_ConstrainProportionsScale: 0
-  m_Children: []
-  m_Father: {fileID: 6509928022762900343}
-  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!4 &2273994552530425533
 Transform:
   m_ObjectHideFlags: 0
@@ -9979,23 +9900,6 @@ MonoBehaviour:
   faceUserOnPlace: 0
   enableKeyboardRecenter: 1
   recenterKey: 114
---- !u!1 &2858713071791873685
-GameObject:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  serializedVersion: 6
-  m_Component:
-  - component: {fileID: 2247668078567943131}
-  - component: {fileID: 8804760683131486805}
-  m_Layer: 0
-  m_Name: SegmentedBufferedTTS
-  m_TagString: Untagged
-  m_Icon: {fileID: 0}
-  m_NavMeshLayer: 0
-  m_StaticEditorFlags: 0
-  m_IsActive: 0
 --- !u!1 &2927739733984211521
 GameObject:
   m_ObjectHideFlags: 0
@@ -10014,21 +9918,6 @@ GameObject:
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
   m_IsActive: 1
---- !u!4 &3031003438456308320
-Transform:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 3633528138033801790}
-  serializedVersion: 2
-  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0, y: 0, z: 0}
-  m_LocalScale: {x: 1, y: 1, z: 1}
-  m_ConstrainProportionsScale: 0
-  m_Children: []
-  m_Father: {fileID: 6509928022762900343}
-  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1001 &3063962212858274922
 PrefabInstance:
   m_ObjectHideFlags: 0
@@ -10376,50 +10265,6 @@ RectTransform:
   m_AnchoredPosition: {x: -0.000011444092, y: 28}
   m_SizeDelta: {x: 200, y: 50}
   m_Pivot: {x: 0.5, y: 1}
---- !u!114 &3431682967973185271
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 3887984515068350}
-  m_Enabled: 0
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: db1f81cd3319ecf4ab39d807d4f4cad2, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: '::'
-  apiKey: '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 '
-  endpoint: https://api.openai.com/v1/audio/speech
-  model: gpt-4o-mini-tts
-  voice: onyx
-  sampleRate: 24000
-  channels: 1
-  speed: 1.25
-  requestTimeoutSeconds: 45
-  maxInputChars: 500
-  instructions: "Habla en espa\xF1ol de Espa\xF1a, castellano peninsular, con pronunciaci\xF3n
-    natural de Castilla y Le\xF3n. Llevo un ritmo r\xE1pido y fluido y con pausas
-    cortas.\r\nEvita acento latinoamericano, evita voseo y evita seseo hispanoamericano.\r\nTono
-    culto, propio de un personaje hist\xF3rico espa\xF1ol. Respuestas cortas: 1-2
-    frases cortas. "
---- !u!114 &3511719192435144052
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 6764782050186674919}
-  m_Enabled: 0
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 722774edb04457847992b1d1cb43e1b6, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::MVP.Conversation.BufferedOpenAITTSClientWav
-  apiKey: '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 '
-  endpoint: https://api.openai.com/v1/audio/speech
-  model: gpt-4o-mini-tts
-  voice: echo
-  instructions: Speak in a warm, natural, conversational tone suitable for a VR character.
-    Keep the pacing clear and slightly expressive.
 --- !u!1 &3554591461532664677
 GameObject:
   m_ObjectHideFlags: 0
@@ -10538,23 +10383,6 @@ MonoBehaviour:
   m_hasFontAssetChanged: 0
   m_baseMaterial: {fileID: 0}
   m_maskOffset: {x: 0, y: 0, z: 0, w: 0}
---- !u!1 &3633528138033801790
-GameObject:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  serializedVersion: 6
-  m_Component:
-  - component: {fileID: 3031003438456308320}
-  - component: {fileID: 7160510613033218680}
-  m_Layer: 0
-  m_Name: BackendChatClient
-  m_TagString: Untagged
-  m_Icon: {fileID: 0}
-  m_NavMeshLayer: 0
-  m_StaticEditorFlags: 0
-  m_IsActive: 0
 --- !u!224 &3669208653220449940
 RectTransform:
   m_ObjectHideFlags: 0
@@ -11893,7 +11721,7 @@ MonoBehaviour:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1057209825567806928}
-  m_Enabled: 1
+  m_Enabled: 0
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: b0b97b38f2f1fd24185315141a6c6a56, type: 3}
   m_Name: 
@@ -12310,21 +12138,23 @@ MonoBehaviour:
   apiKey: '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 '
   endpoint: https://api.openai.com/v1/audio/speech
   model: gpt-4o-mini-tts
-  voice: echo
+  voice: onyx
   instructions: "Habla en espa\xF1ol de Espa\xF1a, castellano peninsular, con pronunciaci\xF3n
     natural de Castilla y Le\xF3n. Llevo un ritmo r\xE1pido y fluido y con pausas
     cortas.\r\nEvita acento latinoamericano, evita voseo y evita seseo hispanoamericano.\r\nTono
     culto, propio de un personaje hist\xF3rico espa\xF1ol. Respuestas cortas: 1-2
     frases cortas. "
+  speed: 1
   sampleRate: 24000
   channels: 1
   maxClipSeconds: 60
-  prebufferSeconds: 0.35
-  drainGraceSeconds: 2
+  requestTimeoutSeconds: 90
+  prebufferSeconds: 0.6
+  drainGraceSeconds: 4
   logChunks: 1
-  captureFullPcmForDebug: 1
-  logExpectedDuration: 1
-  buildDebugClipOnComplete: 1
+  captureFullPcmForDebug: 0
+  logExpectedDuration: 0
+  buildDebugClipOnComplete: 0
 --- !u!114 &4405973012979686595
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -15860,13 +15690,13 @@ MonoBehaviour:
   apiKey: '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 '
   endpoint: https://api.openai.com/v1/chat/completions
   model: gpt-4.1-nano
-  requestTimeoutSeconds: 45
+  requestTimeoutSeconds: 90
   systemPrompt: "You are Francisco de Vitoria, a historical character in a VR experience.
     \r\nAnswer briefly, clearly, with personality, and under 60 words unless asked
     otherwise. Give short answers: 1-2 short sentences. Always answer in Spanish
     from Spain unless explicitly asked otherwise"
   temperature: 0.6
-  maxCompletionTokens: 60
+  maxCompletionTokens: 180
 --- !u!222 &4982974741390587280
 CanvasRenderer:
   m_ObjectHideFlags: 0
@@ -19245,13 +19075,8 @@ Transform:
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children:
-  - {fileID: 3031003438456308320}
   - {fileID: 8808433031116657696}
-  - {fileID: 8001207605022050885}
-  - {fileID: 8526676920109325393}
-  - {fileID: 2247668078567943131}
   - {fileID: 1495054823}
-  - {fileID: 2047814916}
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &6642858948686634561
@@ -19298,23 +19123,6 @@ MonoBehaviour:
   debugLaughterKey: 104
   showLaughter: 1
   laughterScore: 0
---- !u!1 &6764782050186674919
-GameObject:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  serializedVersion: 6
-  m_Component:
-  - component: {fileID: 8001207605022050885}
-  - component: {fileID: 3511719192435144052}
-  m_Layer: 0
-  m_Name: BufferedTTSWav
-  m_TagString: Untagged
-  m_Icon: {fileID: 0}
-  m_NavMeshLayer: 0
-  m_StaticEditorFlags: 0
-  m_IsActive: 0
 --- !u!23 &6820329522959115906
 MeshRenderer:
   m_ObjectHideFlags: 0
@@ -19709,34 +19517,12 @@ MonoBehaviour:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1057209825567806928}
-  m_Enabled: 1
+  m_Enabled: 0
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 25f8f2bdee5c19247846cf7616e1c88a, type: 3}
   m_Name: 
   m_EditorClassIdentifier: '::'
   faceRenderer: {fileID: 1057209825567806926}
---- !u!114 &7160510613033218680
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 3633528138033801790}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 679f20c5578be0847bc909e3aec34a67, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::MVP.Conversation.CharacterBackendChatClient
-  baseUrl: https://your-backend.example.com
-  chatPath: /chat
-  sessionResetPath: session/reset
-  bearerToken: YOUR_BACKEND_TOKEN
-  characterId: francisco-de-vitoria
-  locale: es-ES
-  optionalUserId: 
-  logRequests: 0
-  logResponses: 0
-  callResetEndpointOnNewUser: 0
 --- !u!224 &7221084302483633491
 RectTransform:
   m_ObjectHideFlags: 0
@@ -20480,21 +20266,6 @@ MonoBehaviour:
   m_StartingInteractionStrengthFilters: []
   m_AutoFindParentInteractableInHierarchy: 0
   m_ParentInteractableObject: {fileID: 0}
---- !u!4 &8001207605022050885
-Transform:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 6764782050186674919}
-  serializedVersion: 2
-  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0, y: 0, z: 0}
-  m_LocalScale: {x: 1, y: 1, z: 1}
-  m_ConstrainProportionsScale: 0
-  m_Children: []
-  m_Father: {fileID: 6509928022762900343}
-  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!114 &8192589271668279069
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -20718,21 +20489,6 @@ MonoBehaviour:
   m_ChildScaleWidth: 0
   m_ChildScaleHeight: 0
   m_ReverseArrangement: 0
---- !u!4 &8526676920109325393
-Transform:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 3887984515068350}
-  serializedVersion: 2
-  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0, y: 0, z: 0}
-  m_LocalScale: {x: 1, y: 1, z: 1}
-  m_ConstrainProportionsScale: 0
-  m_Children: []
-  m_Father: {fileID: 6509928022762900343}
-  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!224 &8581615586328326041
 RectTransform:
   m_ObjectHideFlags: 0
@@ -21090,23 +20846,6 @@ MonoBehaviour:
   m_hasFontAssetChanged: 0
   m_baseMaterial: {fileID: 0}
   m_maskOffset: {x: 0, y: 0, z: 0, w: 0}
---- !u!114 &8804760683131486805
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 2858713071791873685}
-  m_Enabled: 0
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 2938b2a3ea0a5a040a7cd2974cc1c5b4, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: '::'
-  innerTtsServiceBehaviour: {fileID: 3431682967973185271}
-  maxSegmentChars: 90
-  logSegments: 1
-  transitionPaddingSeconds: 0.07
-  maxWaitForNextSegmentSeconds: 2.5
 --- !u!4 &8808433031116657696
 Transform:
   m_ObjectHideFlags: 0
@@ -21240,7 +20979,8 @@ MonoBehaviour:
   model: gpt-4o-mini-transcribe
   responseFormat: json
   language: es
-  requestTimeoutSeconds: 60
+  requestTimeoutSeconds: 90
+  logRequestDetails: 0
 --- !u!1 &8968791489103031335
 GameObject:
   m_ObjectHideFlags: 0
@@ -21596,7 +21336,7 @@ MonoBehaviour:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1057209825567806928}
-  m_Enabled: 1
+  m_Enabled: 0
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: f43c520a9bad8a3489109c869f454576, type: 3}
   m_Name: 
@@ -21628,8 +21368,8 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::MVP.Conversation.RealtimeAudioPlayer
   bufferCapacitySamples: 705600
-  prebufferSamples: 126
-  drainGraceSamples: 1024
+  prebufferSamples: 2048
+  drainGraceSamples: 256
   audioSource: {fileID: 4032331762414432206}
 --- !u!1660057539 &9223372036854775807
 SceneRoots:

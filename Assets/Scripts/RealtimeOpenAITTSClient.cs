@@ -60,7 +60,7 @@ namespace MVP.Conversation
         
         [SerializeField]
         [Range(0.5f, 30f)]
-        [Tooltip("Timeout stall (s). Si aumenta y audio se detiene, subir este valor.")]
+        [Tooltip("Tiempo máximo esperando a que entren más samples (s). Sube esto si en respuestas largas el audio se queda parado o tarda en reanudar; bájalo si prefieres abortar antes cuando la cola se atasca.")]
         private float enqueueStallTimeoutSeconds = 8f;
         
         [Header("Smoothing")]
@@ -179,13 +179,35 @@ namespace MVP.Conversation
                     // If the streaming service supports direct player writing, prefer that unified path.
                     if (streamingService is StreamingOpenAITTSClient soc)
                     {
+                        void CompleteDirectStreamHandle()
+                        {
+                            if (verboseLogging)
+                                Debug.Log($"[RealtimeOpenAITTSClient] Direct stream complete turn={turnId}, generation={localGeneration}");
+
+                            handle.MarkCompleted();
+                            RemoveHandle(handle);
+                        }
+
                         StartCoroutine(soc.RequestSpeechStreamedToPlayer(
                             text,
                             realtimeAudioPlayer,
                             turnId,
                             () => { try { onAudioBegan?.Invoke(); } catch (Exception) { } },
-                            err => { try { onError?.Invoke(err); } catch (Exception) { } },
-                            () => { /* completed */ }));
+                            err =>
+                            {
+                                if (verboseLogging)
+                                    Debug.LogError($"[RealtimeOpenAITTSClient] Direct stream error turn={turnId}, generation={localGeneration}: {err}");
+
+                                try { onError?.Invoke(err); } catch (Exception) { }
+                                CompleteDirectStreamHandle();
+                            },
+                            () =>
+                            {
+                                if (verboseLogging)
+                                    Debug.Log($"[RealtimeOpenAITTSClient] Direct stream onCompleted turn={turnId}, generation={localGeneration}");
+
+                                CompleteDirectStreamHandle();
+                            }));
                         return handle;
                     }
 

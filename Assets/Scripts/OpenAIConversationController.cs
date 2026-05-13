@@ -508,6 +508,7 @@ namespace MVP.Conversation
             }
 
             UpdatePanelState("TTS");
+            Debug.Log($"[OpenAIConversationController] State -> TTS turn={turnId}");
             result.timing.StartTts();
 
             bool playbackStarted = false;
@@ -528,6 +529,7 @@ namespace MVP.Conversation
                     result.timing.MarkPlaybackStart();
 
                     UpdatePanelState("Speaking");
+                    Debug.Log($"[OpenAIConversationController] State -> Speaking turn={turnId}");
                     worldSpaceDebugPanel?.AppendTelemetryEvent($"Realtime playback started turn={turnId}");
                 },
                 onError: err =>
@@ -556,17 +558,32 @@ namespace MVP.Conversation
                 if (!IsTurnCurrent(turnId))
                     yield break;
 
+                if (!string.IsNullOrEmpty(streamError))
+                    break;
+
                 yield return null;
             }
 
             if (!IsTurnCurrent(turnId))
                 yield break;
 
+            if (!string.IsNullOrEmpty(streamError))
+            {
+                realtimeTtsService.CancelAll();
+                result.error = streamError;
+                isAssistantSpeaking = false;
+                Debug.Log($"[OpenAIConversationController] TTS error turn={turnId}: {streamError}");
+                UpdatePanelState("Error");
+                UpdatePanelBackendInfo(streamError);
+                yield break;
+            }
+
             if (!handle.IsCompleted)
             {
                 realtimeTtsService.CancelAll();
                 result.error = $"Timeout en TTS realtime tras {safetyTimeout:F0}s.";
                 isAssistantSpeaking = false;
+                Debug.Log($"[OpenAIConversationController] TTS wait timeout turn={turnId}, handleCompleted={handle.IsCompleted}");
                 UpdatePanelState("Error");
                 UpdatePanelBackendInfo(result.error);
                 yield break;
@@ -584,6 +601,7 @@ namespace MVP.Conversation
 
             // PlaybackEnd se entiende aquí como "hemos terminado este turno de TTS"
             result.timing.MarkPlaybackEnd();
+            Debug.Log($"[OpenAIConversationController] TTS end turn={turnId}, playbackStarted={playbackStarted}, handleCompleted={handle.IsCompleted}");
             worldSpaceDebugPanel?.AppendTelemetryEvent($"Realtime playback completed turn={turnId}");
         }
 

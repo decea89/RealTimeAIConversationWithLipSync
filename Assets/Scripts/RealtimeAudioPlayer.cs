@@ -18,8 +18,8 @@ namespace MVP.Conversation
         
         [SerializeField]
         [Range(256, 4096)]
-        [Tooltip("Muestras extra al final para drenar (samples). Más alto=menos riesgo de audio cortado.")]
-        private int drainGraceSamples = 1024;
+        [Tooltip("Muestras que deben quedar como máximo para dar por terminado el audio. Más alto=cierra antes; más bajo=espera más a que drene.")]
+        private int drainGraceSamples = 256;
 
         [Header("Audio Source")]
         [SerializeField]
@@ -35,6 +35,9 @@ namespace MVP.Conversation
         private int generationId;
         private Action onAudioBegan;
         private float[] scratchMono;
+        private bool audioStartedLogged;
+        private bool playbackFinishedLogged;
+        private int lastReportedAvailableSamples = -1;
 
         public int GenerationId => generationId;
         public int AvailableSamples => buffer != null ? buffer.AvailableSamples : 0;
@@ -49,7 +52,6 @@ namespace MVP.Conversation
                 return;
 
             producerCompleted = true;
-            playbackFinished = true;
         }
 
         private void OnEnable()
@@ -106,8 +108,16 @@ namespace MVP.Conversation
             producerCompleted = false;
             playbackFinished = false;
             onAudioBegan = onAudioBeganCallback;
+            audioStartedLogged = false;
+            playbackFinishedLogged = false;
+            lastReportedAvailableSamples = -1;
 
             buffer.Clear();
+
+            Debug.Log(
+                $"[RealtimeAudioPlayer] ResetForNewGeneration generation={generationId}, " +
+                $"prebufferSamples={prebufferSamples}, drainGraceSamples={drainGraceSamples}, " +
+                $"bufferCapacity={bufferCapacitySamples}, audioSourcePlaying={audioSource.isPlaying}");
 
             if (!audioSource.isPlaying)
                 audioSource.Play();
@@ -124,6 +134,11 @@ namespace MVP.Conversation
             producerCompleted = false;
             playbackFinished = true;
             onAudioBegan = null;
+            audioStartedLogged = false;
+            playbackFinishedLogged = true;
+            lastReportedAvailableSamples = 0;
+
+            Debug.Log($"[RealtimeAudioPlayer] StopAndClear generation={generationId}");
 
             if (audioSource.isPlaying)
                 audioSource.Stop();
@@ -149,7 +164,27 @@ namespace MVP.Conversation
                 return 0;
 
             playbackFinished = false;
-            return buffer.WriteSome(samples, offset, sampleCount);
+            int written = buffer.WriteSome(samples, offset, sampleCount);
+
+            if (written > 0 && !audioStartedLogged)
+            {
+                audioStartedLogged = true;
+                Debug.Log(
+                    $"[RealtimeAudioPlayer] First write generation={generationId}, " +
+                    $"written={written}, available={buffer.AvailableSamples}, free={buffer.FreeSamples}");
+            }
+
+            int availableNow = buffer.AvailableSamples;
+            if (written > 0 && Mathf.Abs(availableNow - lastReportedAvailableSamples) >= prebufferSamples)
+            {
+                lastReportedAvailableSamples = availableNow;
+                Debug.Log(
+                    $"[RealtimeAudioPlayer] WriteSomeSamples generation={generationId}, " +
+                    $"written={written}, available={availableNow}, free={buffer.FreeSamples}, " +
+                    $"producerCompleted={producerCompleted}, playbackFinished={playbackFinished}");
+            }
+
+            return written;
         }
 
         private void OnAudioFilterRead(float[] data, int channels)
@@ -169,6 +204,10 @@ namespace MVP.Conversation
             {
                 audioStarted = true;
                 pendingAudioBegan = true;
+
+                Debug.Log(
+                    $"[RealtimeAudioPlayer] Audio started generation={generationId}, " +
+                    $"available={buffer.AvailableSamples}, prebufferSamples={prebufferSamples}");
             }
 
             Array.Clear(scratchMono, 0, frames);
@@ -182,9 +221,18 @@ namespace MVP.Conversation
                     data[idx++] = s;
             }
 
-            if (producerCompleted && buffer.AvailableSamples <= drainGraceSamples)
+            if (producerCompleted && buffer.AvailableSamples == 0)
             {
                 playbackFinished = true;
+
+                if (!playbackFinishedLogged)
+                {
+                    playbackFinishedLogged = true;
+                    Debug.Log(
+                        $"[RealtimeAudioPlayer] Playback finished generation={generationId}, " +
+                        $"available={buffer.AvailableSamples}, drainGraceSamples={drainGraceSamples}, " +
+                        $"producerCompleted={producerCompleted}, audioStarted={audioStarted}");
+                }
             }
         }
     }
