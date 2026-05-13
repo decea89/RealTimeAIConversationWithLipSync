@@ -3,44 +3,79 @@ using UnityEngine;
 
 namespace MVP.Conversation
 {
-    [RequireComponent(typeof(AudioSource))]
     public class RealtimeAudioPlayer : MonoBehaviour
     {
         [Header("Buffer")]
-        [SerializeField] private int bufferCapacitySamples = 44100 * 4; // ~4s a 44.1kHz
-        [SerializeField] private int prebufferSamples = 256;
+        [SerializeField]
+        [Range(48000, 768000)]
+        [Tooltip("Capacidad total del buffer (samples). Más alto=más memoria pero más seguro para audio largo. Típico: 768000 (~16s a 48kHz).")]
+        private int bufferCapacitySamples = 48000 * 16; // ~16s mono a 48kHz
+        
+        [SerializeField]
+        [Range(512, 8192)]
+        [Tooltip("Buffer mínimo antes de reproducir (samples). Más alto=más seguro pero latencia inicial. 2048=~42ms delay.")]
+        private int prebufferSamples = 2048;
+        
+        [SerializeField]
+        [Range(256, 4096)]
+        [Tooltip("Muestras extra al final para drenar (samples). Más alto=menos riesgo de audio cortado.")]
+        private int drainGraceSamples = 1024;
+
+        [Header("Audio Source")]
+        [SerializeField]
+        [Tooltip("AudioSource externo del escenario (p.ej., avatarAudioSource de OpenAIConversationController). Se reutiliza para todas las respuestas.")]
+        private AudioSource audioSource; // External AudioSource (from OpenAIConversationController)
 
         private StreamingAudioBuffer buffer;
-        private AudioSource audioSource;
         private bool isInitialized;
         private bool audioStarted;
         private bool pendingAudioBegan;
+        private bool producerCompleted;
+        private bool playbackFinished;
         private int generationId;
         private Action onAudioBegan;
+        private float[] scratchMono;
 
         public int GenerationId => generationId;
         public int AvailableSamples => buffer != null ? buffer.AvailableSamples : 0;
         public bool IsAudioStarted => audioStarted;
-
         public int FreeSamples => buffer != null ? buffer.FreeSamples : 0;
+        public bool IsPlaybackFinished => playbackFinished;
+        public bool IsProducerCompleted => producerCompleted;
 
-
-        private void Awake()
+        public void MarkStreamingComplete(int producerGeneration)
         {
-            audioSource = GetComponent<AudioSource>();
+            if (!isInitialized || producerGeneration != generationId)
+                return;
+
+            producerCompleted = true;
+            playbackFinished = true;
+        }
+
+        private void OnEnable()
+        {
+            // Lazy initialization: set up when enabled
+            if (isInitialized)
+                return;
+
+            if (audioSource == null)
+            {
+                Debug.LogError("[RealtimeAudioPlayer] audioSource is not assigned. Assign from OpenAIConversationController.avatarAudioSource.");
+                return;
+            }
+
             audioSource.playOnAwake = false;
             audioSource.loop = true;
 
             int sampleRate = AudioSettings.outputSampleRate;
-
             buffer = new StreamingAudioBuffer(bufferCapacitySamples);
 
             audioSource.clip = AudioClip.Create(
                 "RealtimeLoop",
                 bufferCapacitySamples,
-                1,                  // mono
+                1,
                 sampleRate,
-                false);
+                true);
 
             isInitialized = true;
             generationId = 0;
@@ -53,6 +88,11 @@ namespace MVP.Conversation
                 pendingAudioBegan = false;
                 onAudioBegan?.Invoke();
             }
+
+            if (playbackFinished && audioSource.isPlaying)
+            {
+                audioSource.Stop();
+            }
         }
 
         public void ResetForNewGeneration(int newGenerationId, Action onAudioBeganCallback)
@@ -63,16 +103,14 @@ namespace MVP.Conversation
             generationId = newGenerationId;
             audioStarted = false;
             pendingAudioBegan = false;
+            producerCompleted = false;
+            playbackFinished = false;
             onAudioBegan = onAudioBeganCallback;
 
             buffer.Clear();
 
             if (!audioSource.isPlaying)
-            {
-                audioSource.time = 0f;
-                // audioSource.pitch = 1f;
                 audioSource.Play();
-            }
         }
 
         public void StopAndClear()
@@ -83,10 +121,23 @@ namespace MVP.Conversation
             buffer.Clear();
             audioStarted = false;
             pendingAudioBegan = false;
+            producerCompleted = false;
+            playbackFinished = true;
             onAudioBegan = null;
 
             if (audioSource.isPlaying)
                 audioSource.Stop();
+        }
+
+        public void MarkProducerCompleted(int producerGeneration)
+        {
+            if (!isInitialized || producerGeneration != generationId)
+                return;
+
+            producerCompleted = true;
+
+            if (buffer.AvailableSamples <= 0)
+                playbackFinished = true;
         }
 
         public int WriteSomeSamples(float[] samples, int offset, int sampleCount, int sampleGeneration)
@@ -97,21 +148,9 @@ namespace MVP.Conversation
             if (sampleGeneration != generationId)
                 return 0;
 
+            playbackFinished = false;
             return buffer.WriteSome(samples, offset, sampleCount);
         }
-
-
-        // public void WriteSamples(float[] samples, int sampleCount, int sampleGeneration)
-        // {
-        //     if (!isInitialized || samples == null || sampleCount <= 0)
-        //         return;
-
-        //     if (sampleGeneration != generationId)
-        //         return;
-
-        //     // samples viene ya como MONO (tras resampling)
-        //     buffer.Write(samples, sampleCount);
-        // }
 
         private void OnAudioFilterRead(float[] data, int channels)
         {
@@ -122,22 +161,30 @@ namespace MVP.Conversation
             }
 
             int frames = data.Length / channels;
-            float[] mono = new float[frames];
 
-            buffer.Read(mono); // leemos frames mono
-
-            int idx = 0;
-            for (int i = 0; i < frames; i++)
-            {
-                float s = mono[i];
-                for (int c = 0; c < channels; c++)
-                    data[idx++] = s;
-            }
+            if (scratchMono == null || scratchMono.Length < frames)
+                scratchMono = new float[frames];
 
             if (!audioStarted && buffer.AvailableSamples >= prebufferSamples)
             {
                 audioStarted = true;
                 pendingAudioBegan = true;
+            }
+
+            Array.Clear(scratchMono, 0, frames);
+            buffer.Read(scratchMono);
+
+            int idx = 0;
+            for (int i = 0; i < frames; i++)
+            {
+                float s = scratchMono[i];
+                for (int c = 0; c < channels; c++)
+                    data[idx++] = s;
+            }
+
+            if (producerCompleted && buffer.AvailableSamples <= drainGraceSamples)
+            {
+                playbackFinished = true;
             }
         }
     }

@@ -11,18 +11,41 @@ namespace MVP.Conversation
     public class OpenAIChatClient : MonoBehaviour, IChatService
     {
         [Header("OpenAI Chat")]
-        [SerializeField] private string apiKey = "YOUR_OPENAI_API_KEY";
-        [SerializeField] private string endpoint = "https://api.openai.com/v1/chat/completions";
-        [SerializeField] private string model = "gpt-4o-mini";
+        [SerializeField]
+        [Tooltip("Tu API key de OpenAI. Mantener privado.")]
+        private string apiKey = "YOUR_OPENAI_API_KEY";
+        
+        [SerializeField]
+        [Tooltip("Endpoint de OpenAI para chat. No cambiar a menos que uses proxy.")]
+        private string endpoint = "https://api.openai.com/v1/chat/completions";
+        
+        [SerializeField]
+        [Tooltip("Modelo de chat a usar. 'gpt-4o-mini' es rápido y barato.")]
+        private string model = "gpt-4o-mini";
+        
+        [Header("Request Guards")]
+        [SerializeField]
+        [Range(5, 180)]
+        [Tooltip("Timeout chat (s). Si respuestas largas se cortan, aumentar a 90-120.")]
+        private int requestTimeoutSeconds = 90;
 
-        [SerializeField] [TextArea(3, 8)]
+        [SerializeField]
+        [TextArea(3, 8)]
+        [Tooltip("Instrucciones al modelo. Define personalidad y estilo de respuesta.")]
         private string systemPrompt =
             "You are a historical character speaking inside a VR experience. " +
             "Reply briefly, clearly, and with strong personality. " +
             "Default to one short sentence under 25 words unless the user explicitly asks for more detail.";
 
-        [SerializeField] [Range(0f, 2f)] private float temperature = 0.5f;
-        [SerializeField] private int maxCompletionTokens = 60;
+        [SerializeField]
+        [Range(0f, 2f)]
+        [Tooltip("Creatividad (0=determinista, 2=muy creativo). 0.5-0.7=conversación natural.")]
+        private float temperature = 0.5f;
+        
+        [SerializeField]
+        [Range(10, 300)]
+        [Tooltip("Máximo de tokens en respuesta. Más alto=respuestas más largas pero más costo.")]
+        private int maxCompletionTokens = 60;
 
         public IEnumerator RequestChat(string userMessage, Action<string, string> onComplete)
         {
@@ -44,6 +67,7 @@ namespace MVP.Conversation
             using var request = new UnityWebRequest(endpoint, UnityWebRequest.kHttpVerbPOST);
             request.uploadHandler = new UploadHandlerRaw(bodyRaw);
             request.downloadHandler = new DownloadHandlerBuffer();
+            request.timeout = Mathf.Max(5, requestTimeoutSeconds);
             request.SetRequestHeader("Content-Type", "application/json");
             request.SetRequestHeader("Authorization", $"Bearer {apiKey}");
 

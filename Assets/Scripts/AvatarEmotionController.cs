@@ -5,12 +5,19 @@ namespace MVP.Conversation
 {
     public class AvatarEmotionController : MonoBehaviour
     {
-        [SerializeField] private Animator animator;
+        [SerializeField]
+        [Tooltip("Animator del avatar. Si vacío, busca en hijos.")]
+        private Animator animator;
 
         // Nombres de parámetros en el Animator
         [Header("Animator Parameters")]
-        [SerializeField] private string emotionParam = "Emotion";
-        [SerializeField] private string intentParam = "Intent";
+        [SerializeField]
+        [Tooltip("Nombre del parámetro de emoción en Animator (p.ej. 'Emotion'). Sync con Animator.")]
+        private string emotionParam = "Emotion";
+        
+        [SerializeField]
+        [Tooltip("Nombre del parámetro de intención en Animator (p.ej. 'Intent'). Sync con Animator.")]
+        private string intentParam = "Intent";
 
         private void Awake()
         {
