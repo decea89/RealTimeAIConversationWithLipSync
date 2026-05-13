@@ -106,6 +106,7 @@ namespace MVP.Conversation
         private float requestStartedAt = -1f;
         private float firstChunkAt = -1f;
         private bool firstChunkLogged;
+        private float lastChunkReceivedAt = -1f;
 
         public AudioClip DebugCapturedClip => debugCapturedClip;
 
@@ -566,6 +567,24 @@ namespace MVP.Conversation
                     Debug.LogWarning("[StreamingOpenAITTSClient] Error writing PCM samples: " + e.Message);
                 }
             }
+
+            // Telemetry: detect gaps between consecutive ReceiveData calls
+            try
+            {
+                float now = Time.realtimeSinceStartup;
+                if (lastChunkReceivedAt > 0f)
+                {
+                    float gap = now - lastChunkReceivedAt;
+                    // Log noticeable gaps (>80ms) which may cause audible stutters
+                    if (gap > 0.08f && logChunks)
+                    {
+                        int buffered = externalPlayer != null ? externalPlayer.AvailableSamples : (audioBuffer != null ? audioBuffer.AvailableSamples : 0);
+                        Debug.LogWarning($"[StreamingOpenAITTSClient] LARGE CHUNK GAP: {gap:F3}s, bytes={dataLength}, bufferedSamples={buffered}");
+                    }
+                }
+                lastChunkReceivedAt = now;
+            }
+            catch (Exception) { }
 
             Interlocked.Add(ref totalBytesReceived, dataLength);
 

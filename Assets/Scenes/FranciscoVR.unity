@@ -21368,8 +21368,8 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::MVP.Conversation.RealtimeAudioPlayer
   bufferCapacitySamples: 705600
-  prebufferSamples: 2048
-  drainGraceSamples: 256
+  prebufferSamples: 16384
+  drainGraceSamples: 1024
   audioSource: {fileID: 4032331762414432206}
 --- !u!1660057539 &9223372036854775807
 SceneRoots:
