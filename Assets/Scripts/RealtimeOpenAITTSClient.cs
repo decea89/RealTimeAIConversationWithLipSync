@@ -198,6 +198,7 @@ namespace MVP.Conversation
                         StartCoroutine(soc.RequestSpeechStreamedToPlayer(
                             text,
                             realtimeAudioPlayer,
+                            lipSyncBridge,
                             turnId,
                             () => { try { onAudioBegan?.Invoke(); } catch (Exception) { } },
                             err =>
