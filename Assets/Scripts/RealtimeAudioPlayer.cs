@@ -18,8 +18,8 @@ namespace MVP.Conversation
         
         [SerializeField]
         [Range(0, 16384)]
-        [Tooltip("Muestras extra de margen de seguridad antes de considerar que el audio ha comenzado. Ajusta para absorber pequeñas pausas al inicio.")]
-        private int startSafetySamples = 2048;
+        [Tooltip("Muestras extra de margen de seguridad antes de considerar que el audio ha comenzado. Sube este valor si oyes un corte breve al inicio.")]
+        private int startSafetySamples = 4096;
         
         [SerializeField]
         [Range(256, 4096)]
