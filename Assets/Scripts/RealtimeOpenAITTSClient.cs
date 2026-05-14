@@ -35,6 +35,10 @@ namespace MVP.Conversation
         private RealtimeAudioPlayer realtimeAudioPlayer;
         
         [SerializeField]
+        [Tooltip("Componente OVRLipSyncChunkBridge. Enqueue clips para lip sync en tiempo real. Opcional.")]
+        private OVRLipSyncChunkBridge lipSyncBridge;
+        
+        [SerializeField]
         [Tooltip("(Obsoleto) AudioSource antiguo. No se usa en la ruta de streaming actual.")]
         private AudioSource streamingAudioSource;
 
@@ -167,6 +171,9 @@ namespace MVP.Conversation
 
             realtimeAudioPlayer.ResetForNewGeneration(localGeneration, wrappedOnAudioBegan);
 
+            if (lipSyncBridge != null)
+                lipSyncBridge.ResetForNewGeneration(localGeneration);
+
             var handle = new RealtimeTTSHandle(turnId, localGeneration, this);
             activeHandles.Add(handle);
 
@@ -240,6 +247,9 @@ namespace MVP.Conversation
 
             if (realtimeAudioPlayer != null)
                 realtimeAudioPlayer.StopAndClear();
+
+            if (lipSyncBridge != null)
+                lipSyncBridge.StopAndClear();
 
             if (streamingAudioSource != null)
             {
@@ -392,6 +402,13 @@ namespace MVP.Conversation
         }
 
         Debug.Log($"[RealtimeTTS] EnqueueSamplesGradually START chunk {currentIndex+1}/{chunks.Count} samples={samples.Length}");
+        
+        // Enqueue clip to lip sync bridge if available
+        if (lipSyncBridge != null && currentClip != null)
+        {
+            lipSyncBridge.EnqueueClip(currentClip, handle.GenerationId);
+        }
+        
         yield return EnqueueSamplesGradually(samples, handle, currentIndex, chunks.Count);
         Debug.Log($"[RealtimeTTS] EnqueueSamplesGradually END chunk {currentIndex+1}/{chunks.Count}");
 
