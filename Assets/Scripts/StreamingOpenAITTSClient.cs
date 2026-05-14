@@ -105,6 +105,7 @@ namespace MVP.Conversation
         private StreamingAudioBuffer audioBuffer;
         // Optional external player to write samples into (shared playback path)
         private RealtimeAudioPlayer externalPlayer;
+        private OVRLipSyncChunkBridge externalLipSyncBridge;
         private int externalPlayerGenerationId; // Track generation for cancellation detection
         private volatile bool streamCompleted;
         private volatile bool streamFailed;
@@ -128,6 +129,7 @@ namespace MVP.Conversation
         public IEnumerator RequestSpeechStreamedToPlayer(
             string text,
             RealtimeAudioPlayer targetPlayer,
+            OVRLipSyncChunkBridge lipSyncBridge,
             int turnId,
             Action onPlaybackStarted,
             Action<string> onError,
@@ -147,6 +149,9 @@ namespace MVP.Conversation
 
             externalPlayer = targetPlayer;
             externalPlayerGenerationId = targetPlayer.GenerationId;
+            externalLipSyncBridge = lipSyncBridge;
+            if (externalLipSyncBridge != null && logChunks)
+                Debug.Log($"[StreamingOpenAITTSClient] LipSync bridge attached for turn={turnId}, gen={externalPlayerGenerationId}");
             activeTurnId = turnId;
             requestStartedAt = Time.realtimeSinceStartup;
             firstChunkAt = -1f;
@@ -194,7 +199,7 @@ namespace MVP.Conversation
                 request.SetRequestHeader("Content-Type", "application/json");
                 request.SetRequestHeader("Authorization", $"Bearer {apiKey}");
 
-                var operation = request.SendWebRequest();
+                    var operation = request.SendWebRequest();
                 bool requestAbortedByTimeout = false;
 
                 while (!operation.isDone)
@@ -606,6 +611,23 @@ namespace MVP.Conversation
                         if (written < toWrite.Length && logChunks)
                         {
                             Debug.LogWarning($"[StreamingOpenAITTSClient] Buffer full: wrote {written}/{toWrite.Length} samples, dropping remainder.");
+                        }
+                    }
+
+                    // Mirror samples to lip sync bridge if provided, but do it safely so it cannot break audio path.
+                    if (externalLipSyncBridge != null)
+                    {
+                        try
+                        {
+                            int gen = externalPlayer != null ? externalPlayer.GenerationId : externalPlayerGenerationId;
+                            externalLipSyncBridge.EnqueueSamples(toWrite, outputSr, gen);
+                            if (logChunks)
+                                Debug.Log($"[StreamingOpenAITTSClient] Enqueued {toWrite.Length} samples to LipSync bridge (gen={gen}).");
+                        }
+                        catch (Exception lipSyncException)
+                        {
+                            if (logChunks)
+                                Debug.LogWarning("[StreamingOpenAITTSClient] Lip sync bridge failed: " + lipSyncException.Message);
                         }
                     }
 

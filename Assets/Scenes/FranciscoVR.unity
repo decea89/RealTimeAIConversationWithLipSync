@@ -3037,7 +3037,7 @@ AudioSource:
   m_audioClip: {fileID: 0}
   m_Resource: {fileID: 0}
   m_PlayOnAwake: 0
-  m_Volume: 1
+  m_Volume: 0.03
   m_Pitch: 1
   Loop: 0
   Mute: 0
@@ -3135,7 +3135,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::MVP.Conversation.OVRLipSyncChunkBridge
   lipSyncAudioSource: {fileID: 1104509728}
   muteAudioSource: 0
-  bridgeVolume: 1
+  bridgeVolume: 0.03
   stopAndFlushOnNewGeneration: 1
   verboseLogs: 0
 --- !u!114 &1104509730
@@ -3670,8 +3670,8 @@ MonoBehaviour:
   realtimeAudioPlayer: {fileID: 9206487418811563760}
   lipSyncBridge: {fileID: 1104509729}
   streamingAudioSource: {fileID: 4032331762414432206}
-  maxChunkChars: 40
-  interChunkGapSeconds: 0
+  maxChunkChars: 30
+  interChunkGapSeconds: 0.05
   verboseLogging: 1
   enableTelemetry: 1
   enqueueStallTimeoutSeconds: 15
@@ -12540,7 +12540,7 @@ MonoBehaviour:
     cortas.\r\nEvita acento latinoamericano, evita voseo y evita seseo hispanoamericano.\r\nTono
     culto, propio de un personaje hist\xF3rico espa\xF1ol. Respuestas cortas: 1-2
     frases cortas. "
-  speed: 1
+  speed: 1.25
   sampleRate: 24000
   channels: 1
   maxClipSeconds: 60
