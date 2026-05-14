@@ -58,6 +58,16 @@ namespace MVP.Conversation
         [Range(5, 180)]
         [Tooltip("Timeout de la petición TTS (s). Súbelo si respuestas largas empiezan a cortar o fallar después de iniciar el audio; bájalo solo si quieres abortar antes.")]
         private int requestTimeoutSeconds = 90;
+
+        [SerializeField]
+        [Range(1f, 15f)]
+        [Tooltip("Tiempo máximo esperando el primer chunk PCM antes de abortar el stream. Útil para evitar silencios largos al arrancar.")]
+        private float firstChunkTimeoutSeconds = 4f;
+
+        [SerializeField]
+        [Range(1f, 15f)]
+        [Tooltip("Tiempo máximo sin recibir PCM una vez que el stream ya empezó. Si se supera, el stream se cancela para evitar cortes largos o esperas infinitas.")]
+        private float chunkSilenceTimeoutSeconds = 2.5f;
         
         [SerializeField]
         [Range(0.05f, 2.0f)]
@@ -73,6 +83,11 @@ namespace MVP.Conversation
         [SerializeField]
         [Tooltip("Mostrar logs de chunks PCM en consola. Útil para diagnosticar problemas.")]
         private bool logChunks = true;
+
+        [SerializeField]
+        [Range(0.08f, 1.0f)]
+        [Tooltip("Gap mínimo entre chunks para mostrar un warning. Sube este valor para reducir ruido de consola cuando el streaming está aceptable.")]
+        private float largeChunkGapWarningSeconds = 0.25f;
 
         [Header("Diagnostics")]
         [SerializeField]
@@ -153,6 +168,7 @@ namespace MVP.Conversation
             hasPendingOddByte = false;
             pendingOddByte = 0;
             fullPcmCapture.Clear();
+            lastChunkReceivedAt = -1f;
 
             var downloadHandler = new PcmStreamingDownloadHandler(this);
 
@@ -178,7 +194,33 @@ namespace MVP.Conversation
                 request.SetRequestHeader("Content-Type", "application/json");
                 request.SetRequestHeader("Authorization", $"Bearer {apiKey}");
 
-                yield return request.SendWebRequest();
+                var operation = request.SendWebRequest();
+
+                while (!operation.isDone)
+                {
+                    if (streamFailed)
+                        break;
+
+                    float now = Time.realtimeSinceStartup;
+                    bool waitingForFirstChunk = !firstChunkLogged && firstChunkAt < 0f;
+                    bool firstChunkTimedOut = waitingForFirstChunk && (now - requestStartedAt) >= firstChunkTimeoutSeconds;
+                    bool chunkSilenceTimedOut = firstChunkLogged && lastChunkReceivedAt > 0f && (now - lastChunkReceivedAt) >= chunkSilenceTimeoutSeconds;
+
+                    if (firstChunkTimedOut || chunkSilenceTimedOut)
+                    {
+                        streamFailed = true;
+                        streamErrorMessage = firstChunkTimedOut
+                            ? $"StreamingOpenAITTSClient: timeout esperando el primer chunk PCM ({firstChunkTimeoutSeconds:0.0}s)."
+                            : $"StreamingOpenAITTSClient: timeout por silencio PCM ({chunkSilenceTimeoutSeconds:0.0}s) tras el último chunk.";
+
+                        try { request.Abort(); } catch (Exception) { }
+                        if (logChunks)
+                            Debug.LogWarning($"[StreamingOpenAITTSClient] {streamErrorMessage}");
+                        break;
+                    }
+
+                    yield return null;
+                }
 
                 if (logChunks)
                 {
@@ -262,6 +304,7 @@ namespace MVP.Conversation
 
             fullPcmCapture.Clear();
             debugCapturedClip = null;
+            lastChunkReceivedAt = -1f;
 
             int capacitySamples = sampleRate * channels * maxClipSeconds;
             audioBuffer = new StreamingAudioBuffer(capacitySamples);
@@ -575,11 +618,15 @@ namespace MVP.Conversation
                 if (lastChunkReceivedAt > 0f)
                 {
                     float gap = now - lastChunkReceivedAt;
-                    // Log noticeable gaps (>80ms) which may cause audible stutters
-                    if (gap > 0.08f && logChunks)
+                    // Log only meaningful gaps so the console stays readable.
+                    if (gap > largeChunkGapWarningSeconds && logChunks)
                     {
                         int buffered = externalPlayer != null ? externalPlayer.AvailableSamples : (audioBuffer != null ? audioBuffer.AvailableSamples : 0);
                         Debug.LogWarning($"[StreamingOpenAITTSClient] LARGE CHUNK GAP: {gap:F3}s, bytes={dataLength}, bufferedSamples={buffered}");
+                    }
+                    else if (gap > 0.08f && logChunks)
+                    {
+                        Debug.Log($"[StreamingOpenAITTSClient] chunk gap: {gap:F3}s, bytes={dataLength}");
                     }
                 }
                 lastChunkReceivedAt = now;
@@ -745,6 +792,9 @@ namespace MVP.Conversation
 
             // Attach to external player
             externalPlayer = player;
+            requestStartedAt = Time.realtimeSinceStartup;
+            firstChunkAt = -1f;
+            firstChunkLogged = false;
 
             streamCompleted = false;
             streamFailed = false;
@@ -799,6 +849,24 @@ namespace MVP.Conversation
                 {
                     playbackStarted = true;
                     onPlaybackStarted?.Invoke();
+                }
+
+                float now = Time.realtimeSinceStartup;
+                bool waitingForFirstChunk = !playbackStarted && !player.IsAudioStarted && player.AvailableSamples <= 0;
+                bool firstChunkTimedOut = waitingForFirstChunk && (now - requestStartedAt) >= firstChunkTimeoutSeconds;
+                bool chunkSilenceTimedOut = playbackStarted && lastChunkReceivedAt > 0f && (now - lastChunkReceivedAt) >= chunkSilenceTimeoutSeconds;
+
+                if (firstChunkTimedOut || chunkSilenceTimedOut)
+                {
+                    streamFailed = true;
+                    streamErrorMessage = firstChunkTimedOut
+                        ? $"StreamingOpenAITTSClient: timeout esperando el primer chunk PCM ({firstChunkTimeoutSeconds:0.0}s)."
+                        : $"StreamingOpenAITTSClient: timeout por silencio PCM ({chunkSilenceTimeoutSeconds:0.0}s) tras el último chunk.";
+
+                    try { request.Abort(); } catch (Exception) { }
+                    if (logChunks)
+                        Debug.LogWarning($"[StreamingOpenAITTSClient] {streamErrorMessage}");
+                    continue;
                 }
 
                 if (operation.isDone)
