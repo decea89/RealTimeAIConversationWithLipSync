@@ -4,7 +4,7 @@
 QualitySettings:
   m_ObjectHideFlags: 0
   serializedVersion: 5
-  m_CurrentQuality: 1
+  m_CurrentQuality: 2
   m_QualitySettings:
   - serializedVersion: 5
     name: Mobile
@@ -60,6 +60,7 @@ QualitySettings:
     terrainMaxTrees: 50
     excludedTargetPlatforms:
     - Standalone
+    - Android
   - serializedVersion: 5
     name: PC
     pixelLightCount: 2
@@ -113,8 +114,8 @@ QualitySettings:
     terrainFadeLength: 5
     terrainMaxTrees: 50
     excludedTargetPlatforms:
-    - Android
     - iPhone
+    - Standalone
   - serializedVersion: 5
     name: Meta Quest (Build Profile)
     pixelLightCount: 2
@@ -131,7 +132,7 @@ QualitySettings:
     globalTextureMipmapLimit: 0
     textureMipmapLimitSettings: []
     anisotropicTextures: 2
-    antiAliasing: 0
+    antiAliasing: 2
     softParticles: 0
     softVegetation: 1
     realtimeReflectionProbes: 0
@@ -167,11 +168,10 @@ QualitySettings:
     terrainBillboardStart: 50
     terrainFadeLength: 5
     terrainMaxTrees: 50
-    excludedTargetPlatforms:
-    - Standalone
+    excludedTargetPlatforms: []
   m_TextureMipmapLimitGroupNames: []
   m_PerPlatformDefaultQuality:
-    Android: 0
+    Android: 2
     GameCoreScarlett: 1
     GameCoreXboxOne: 1
     Lumin: 0
@@ -181,7 +181,7 @@ QualitySettings:
     PS5: 1
     Server: 0
     Stadia: 0
-    Standalone: 1
+    Standalone: 2
     WebGL: 0
     Windows Store Apps: 0
     XboxOne: 0
