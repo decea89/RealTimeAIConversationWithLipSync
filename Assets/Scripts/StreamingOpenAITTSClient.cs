@@ -102,6 +102,16 @@ namespace MVP.Conversation
         [Tooltip("Crear AudioClip debug al terminar. Acumula memoria en sesiones largas.")]
         private bool buildDebugClipOnComplete = false;
 
+        // Public runtime accessors for UI
+        public float FirstChunkTimeoutSeconds { get => firstChunkTimeoutSeconds; set => firstChunkTimeoutSeconds = Mathf.Max(0.1f, value); }
+        public float ChunkSilenceTimeoutSeconds { get => chunkSilenceTimeoutSeconds; set => chunkSilenceTimeoutSeconds = Mathf.Max(0.1f, value); }
+        public float PrebufferSeconds { get => prebufferSeconds; set => prebufferSeconds = Mathf.Max(0f, value); }
+        public float DrainGraceSeconds { get => drainGraceSeconds; set => drainGraceSeconds = Mathf.Max(0f, value); }
+        public bool LogChunks { get => logChunks; set => logChunks = value; }
+        public float LargeChunkGapWarningSeconds { get => largeChunkGapWarningSeconds; set => largeChunkGapWarningSeconds = Mathf.Max(0f, value); }
+        public bool CaptureFullPcmForDebug { get => captureFullPcmForDebug; set => captureFullPcmForDebug = value; }
+        public bool BuildDebugClipOnComplete { get => buildDebugClipOnComplete; set => buildDebugClipOnComplete = value; }
+
         private StreamingAudioBuffer audioBuffer;
         // Optional external player to write samples into (shared playback path)
         private RealtimeAudioPlayer externalPlayer;
@@ -539,6 +549,8 @@ namespace MVP.Conversation
                         $"elapsed={(firstChunkAt - requestStartedAt):F2}s, bytes={dataLength}, " +
                         $"generation={(externalPlayer != null ? externalPlayer.GenerationId : -1)}");
                 }
+
+                MVP.Conversation.LipSyncTelemetry.Enqueue(MVP.Conversation.LipSyncTelemetry.EventId.FirstChunkReceived, activeTurnId, externalPlayer != null ? externalPlayer.GenerationId : externalPlayerGenerationId, dataLength);
             }
 
             int totalBytesToProcess = dataLength + (hasPendingOddByte ? 1 : 0);
@@ -614,23 +626,6 @@ namespace MVP.Conversation
                         }
                     }
 
-                    // Mirror samples to lip sync bridge if provided, but do it safely so it cannot break audio path.
-                    if (externalLipSyncBridge != null)
-                    {
-                        try
-                        {
-                            int gen = externalPlayer != null ? externalPlayer.GenerationId : externalPlayerGenerationId;
-                            externalLipSyncBridge.EnqueueSamples(toWrite, outputSr, gen);
-                            if (logChunks)
-                                Debug.Log($"[StreamingOpenAITTSClient] Enqueued {toWrite.Length} samples to LipSync bridge (gen={gen}).");
-                        }
-                        catch (Exception lipSyncException)
-                        {
-                            if (logChunks)
-                                Debug.LogWarning("[StreamingOpenAITTSClient] Lip sync bridge failed: " + lipSyncException.Message);
-                        }
-                    }
-
                 }
                 catch (Exception e)
                 {
@@ -656,7 +651,10 @@ namespace MVP.Conversation
                         Debug.Log($"[StreamingOpenAITTSClient] chunk gap: {gap:F3}s, bytes={dataLength}");
                     }
                 }
-                lastChunkReceivedAt = now;
+                    // Telemetry: record chunk gap in ms (value)
+                    int gapMs = lastChunkReceivedAt > 0f ? (int)((now - lastChunkReceivedAt) * 1000f) : 0;
+                    MVP.Conversation.LipSyncTelemetry.Enqueue(MVP.Conversation.LipSyncTelemetry.EventId.ChunkReceived, activeTurnId, externalPlayer != null ? externalPlayer.GenerationId : externalPlayerGenerationId, gapMs);
+                    lastChunkReceivedAt = now;
             }
             catch (Exception) { }
 

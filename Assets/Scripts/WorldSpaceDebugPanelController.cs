@@ -57,10 +57,22 @@ namespace MVP.Conversation
         [SerializeField] private Slider interChunksGapSlider;
         [SerializeField] private TMP_Text interChunksGapValueText;
 
+        // Minimal controls for non-technical testing
+        // RealtimeAudioPlayer controls (kept minimal)
+        [SerializeField] private Slider prebufferSlider;
+        [SerializeField] private TMP_Text prebufferValueText;
+
+        [SerializeField] private Slider startSafetySlider;
+        [SerializeField] private TMP_Text startSafetyValueText;
+
         [Header("Buttons")]
         [SerializeField] private Button newUserButton;
         [SerializeField] private Button clearTranscriptButton;
         [SerializeField] private Button clearLogsButton;
+        [SerializeField] private Button applyLowLatencyButton;
+        [SerializeField] private Button applySafeButton;
+        [SerializeField] private Button applyDefaultButton;
+        [SerializeField] private Button flushTelemetryButton;
 
         [Header("Optional")]
         [SerializeField] private bool captureUnityLogs = true;
@@ -139,6 +151,12 @@ namespace MVP.Conversation
             if (interChunksGapSlider != null)
                 interChunksGapSlider.onValueChanged.AddListener(OnInterChunksGapSliderChanged);
 
+            if (prebufferSlider != null)
+                prebufferSlider.onValueChanged.AddListener(OnPrebufferChanged);
+
+            if (startSafetySlider != null)
+                startSafetySlider.onValueChanged.AddListener(OnStartSafetyChanged);
+
             if (newUserButton != null)
                 newUserButton.onClick.AddListener(OnNewUserClicked);
 
@@ -147,6 +165,18 @@ namespace MVP.Conversation
 
             if (clearLogsButton != null)
                 clearLogsButton.onClick.AddListener(OnClearLogsClicked);
+
+            if (applyLowLatencyButton != null)
+                applyLowLatencyButton.onClick.AddListener(ApplyLowLatencyPreset);
+
+            if (applySafeButton != null)
+                applySafeButton.onClick.AddListener(ApplySafePreset);
+
+            if (applyDefaultButton != null)
+                applyDefaultButton.onClick.AddListener(ApplyDefaultPreset);
+
+            if (flushTelemetryButton != null)
+                flushTelemetryButton.onClick.AddListener(OnFlushTelemetryClicked);
         }
 
         private void UnwireUI()
@@ -175,6 +205,12 @@ namespace MVP.Conversation
             if (interChunksGapSlider != null)
                 interChunksGapSlider.onValueChanged.RemoveListener(OnInterChunksGapSliderChanged);
 
+            if (prebufferSlider != null)
+                prebufferSlider.onValueChanged.RemoveListener(OnPrebufferChanged);
+
+            if (startSafetySlider != null)
+                startSafetySlider.onValueChanged.RemoveListener(OnStartSafetyChanged);
+
             if (newUserButton != null)
                 newUserButton.onClick.RemoveListener(OnNewUserClicked);
 
@@ -183,6 +219,18 @@ namespace MVP.Conversation
 
             if (clearLogsButton != null)
                 clearLogsButton.onClick.RemoveListener(OnClearLogsClicked);
+
+            if (applyLowLatencyButton != null)
+                applyLowLatencyButton.onClick.RemoveListener(ApplyLowLatencyPreset);
+
+            if (applySafeButton != null)
+                applySafeButton.onClick.RemoveListener(ApplySafePreset);
+
+            if (applyDefaultButton != null)
+                applyDefaultButton.onClick.RemoveListener(ApplyDefaultPreset);
+
+            if (flushTelemetryButton != null)
+                flushTelemetryButton.onClick.RemoveListener(OnFlushTelemetryClicked);
         }
 
         public void SetConversationSnapshot(
@@ -248,23 +296,63 @@ namespace MVP.Conversation
             RefreshRuntimeValues();
             RefreshTelemetrySummary();
 
+            // Ensure labels show an initial value even before runtime targets are available.
+            InitializeSliderLabelsFromUI();
+
             if (stateText != null)
                 stateText.text = BuildStateText();
 
             if (metricsText != null)
                 metricsText.text = BuildMetricsText();
 
-            if (lipSyncToggle != null && lipSyncBehaviour != null)
-                lipSyncToggle.SetIsOnWithoutNotify(lipSyncBehaviour.enabled);
+            if (lipSyncToggle != null)
+                lipSyncToggle.SetIsOnWithoutNotify(true);
 
-            if (emotionToggle != null && emotionBehaviour != null)
-                emotionToggle.SetIsOnWithoutNotify(emotionBehaviour.enabled);
+            if (emotionToggle != null)
+                emotionToggle.SetIsOnWithoutNotify(false);
+
+            if (showAssistantTextToggle != null)
+                showAssistantTextToggle.SetIsOnWithoutNotify(true);
+
+            if (showBackendInfoToggle != null)
+                showBackendInfoToggle.SetIsOnWithoutNotify(true);
+
+            if (showSourcesToggle != null)
+                showSourcesToggle.SetIsOnWithoutNotify(true);
+
+            if (lipSyncBehaviour != null)
+                lipSyncBehaviour.enabled = true;
+
+            if (emotionBehaviour != null)
+                emotionBehaviour.enabled = false;
+
+            // Re-apply view-dependent text after forcing initial toggle states.
+            RefreshTranscriptTexts();
+            RefreshBackendText();
 
             if (volumeSlider != null && avatarAudioSource != null)
             {
                 volumeSlider.SetValueWithoutNotify(avatarAudioSource.volume);
                 UpdateSliderLabel(volumeValueText, avatarAudioSource.volume, "0.00");
             }
+        }
+
+        private void InitializeSliderLabelsFromUI()
+        {
+            if (volumeSlider != null)
+                UpdateSliderLabel(volumeValueText, volumeSlider.value, "0.00");
+
+            if (maxChunkCharsSlider != null)
+                UpdateSliderLabel(maxChunkCharsValueText, Mathf.RoundToInt(maxChunkCharsSlider.value), "0");
+
+            if (interChunksGapSlider != null)
+                UpdateSliderLabel(interChunksGapValueText, interChunksGapSlider.value, "0.000");
+
+            if (prebufferSlider != null)
+                UpdateSliderLabel(prebufferValueText, Mathf.RoundToInt(prebufferSlider.value), "0");
+
+            if (startSafetySlider != null)
+                UpdateSliderLabel(startSafetyValueText, Mathf.RoundToInt(startSafetySlider.value), "0");
         }
 
         private void RefreshSessionInfo()
@@ -289,22 +377,57 @@ namespace MVP.Conversation
             if (volumeValueText != null && avatarAudioSource != null)
                 UpdateSliderLabel(volumeValueText, avatarAudioSource.volume, "0.00");
 
-            if (realtimeTtsClient == null)
-                return;
-
-            if (maxChunkCharsSlider != null)
+            if (maxChunkCharsSlider != null && realtimeTtsClient != null)
             {
                 float value = realtimeTtsClient.MaxChunkChars;
                 maxChunkCharsSlider.SetValueWithoutNotify(value);
                 UpdateSliderLabel(maxChunkCharsValueText, value, "0");
             }
 
-            if (interChunksGapSlider != null)
+            if (interChunksGapSlider != null && realtimeTtsClient != null)
             {
                 float value = realtimeTtsClient.InterChunkGapSeconds;
                 interChunksGapSlider.SetValueWithoutNotify(value);
                 UpdateSliderLabel(interChunksGapValueText, value, "0.000");
             }
+
+            // Sync RealtimeAudioPlayer parameters (minimal)
+            if (prebufferSlider != null)
+            {
+                var player = FindObjectOfType<RealtimeAudioPlayer>();
+                if (player != null)
+                {
+                    prebufferSlider.SetValueWithoutNotify(player.PrebufferSamples);
+                    UpdateSliderLabel(prebufferValueText, player.PrebufferSamples, "0");
+
+                    startSafetySlider.SetValueWithoutNotify(player.StartSafetySamples);
+                    UpdateSliderLabel(startSafetyValueText, player.StartSafetySamples, "0");
+                }
+            }
+        }
+
+        private void OnPrebufferChanged(float value)
+        {
+            int v = Mathf.RoundToInt(value);
+            UpdateSliderLabel(prebufferValueText, v, "0");
+
+            var player = FindObjectOfType<RealtimeAudioPlayer>();
+            if (player == null) return;
+
+            player.PrebufferSamples = v;
+            AppendLocalLog($"prebufferSamples -> {v}");
+        }
+
+        private void OnStartSafetyChanged(float value)
+        {
+            int v = Mathf.RoundToInt(value);
+            UpdateSliderLabel(startSafetyValueText, v, "0");
+
+            var player = FindObjectOfType<RealtimeAudioPlayer>();
+            if (player == null) return;
+
+            player.StartSafetySamples = v;
+            AppendLocalLog($"startSafetySamples -> {v}");
         }
 
         private void RefreshTelemetrySummary()
@@ -452,23 +575,73 @@ namespace MVP.Conversation
 
         private void OnMaxChunkCharsSliderChanged(float value)
         {
+            int intValue = Mathf.RoundToInt(value);
+            UpdateSliderLabel(maxChunkCharsValueText, intValue, "0");
+
             if (realtimeTtsClient == null)
                 return;
 
-            int intValue = Mathf.RoundToInt(value);
             realtimeTtsClient.MaxChunkChars = intValue;
-            UpdateSliderLabel(maxChunkCharsValueText, intValue, "0");
             AppendLocalLog($"Max chunk chars -> {intValue}");
         }
 
         private void OnInterChunksGapSliderChanged(float value)
         {
+            UpdateSliderLabel(interChunksGapValueText, value, "0.000");
+
             if (realtimeTtsClient == null)
                 return;
 
             realtimeTtsClient.InterChunkGapSeconds = value;
-            UpdateSliderLabel(interChunksGapValueText, value, "0.000");
             AppendLocalLog($"Inter-chunk gap -> {value:0.000}");
+        }
+
+        // Streaming handlers
+        // Streaming handlers removed (simplified UI)
+
+        // Realtime client handlers removed (simplified UI)
+
+        // Bridge handlers removed (simplified UI)
+
+        // Preset application
+        private void ApplyLowLatencyPreset()
+        {
+            // RealtimeAudioPlayer
+            var player = FindObjectOfType<RealtimeAudioPlayer>();
+            if (player != null)
+            {
+                player.PrebufferSamples = 1024;
+                player.StartSafetySamples = 512;
+            }
+            AppendLocalLog("Applied preset: Low Latency (player-only)");
+        }
+
+        private void ApplySafePreset()
+        {
+            var player = FindObjectOfType<RealtimeAudioPlayer>();
+            if (player != null)
+            {
+                player.PrebufferSamples = 4096;
+                player.StartSafetySamples = 8192;
+            }
+            AppendLocalLog("Applied preset: Safe (player-only)");
+        }
+
+        private void ApplyDefaultPreset()
+        {
+            var player = FindObjectOfType<RealtimeAudioPlayer>();
+            if (player != null)
+            {
+                player.PrebufferSamples = 2048;
+                player.StartSafetySamples = 4096;
+            }
+            AppendLocalLog("Applied preset: Default (player-only)");
+        }
+
+        private void OnFlushTelemetryClicked()
+        {
+            MVP.Conversation.LipSyncTelemetry.Flush();
+            AppendLocalLog("Telemetry flushed to disk");
         }
 
         private void OnNewUserClicked()

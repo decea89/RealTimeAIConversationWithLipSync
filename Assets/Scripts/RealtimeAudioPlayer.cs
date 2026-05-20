@@ -20,6 +20,15 @@ namespace MVP.Conversation
         [Range(0, 16384)]
         [Tooltip("Muestras extra de margen de seguridad antes de considerar que el audio ha comenzado. Sube este valor si oyes un corte breve al inicio.")]
         private int startSafetySamples = 4096;
+
+        private bool enableAdaptiveStart = true;
+
+        private int adaptiveStartMinSamples = 2048;
+
+        [SerializeField]
+        [Range(20, 500)]
+        [Tooltip("Espera maxima (ms) tras el primer write antes de arrancar con inicio adaptativo.")]
+        private int adaptiveStartMaxWaitMs = 120;
         
         [SerializeField]
         [Range(256, 4096)]
@@ -43,6 +52,9 @@ namespace MVP.Conversation
         private bool audioStartedLogged;
         private bool playbackFinishedLogged;
         private int lastReportedAvailableSamples = -1;
+        private OVRLipSyncChunkBridge lipSyncBridge;
+        private bool hasFirstWrite;
+        private long firstWriteAtMs;
 
         public int GenerationId => generationId;
         public int AvailableSamples => buffer != null ? buffer.AvailableSamples : 0;
@@ -51,12 +63,51 @@ namespace MVP.Conversation
         public bool IsPlaybackFinished => playbackFinished;
         public bool IsProducerCompleted => producerCompleted;
 
+        // Expose runtime-configurable parameters to UI
+        public int PrebufferSamples
+        {
+            get => prebufferSamples;
+            set => prebufferSamples = Mathf.Clamp(value, 256, 16384);
+        }
+
+        public int StartSafetySamples
+        {
+            get => startSafetySamples;
+            set => startSafetySamples = Mathf.Max(0, value);
+        }
+
+        public bool EnableAdaptiveStart
+        {
+            get => enableAdaptiveStart;
+            set => enableAdaptiveStart = value;
+        }
+
+        public int AdaptiveStartMinSamples
+        {
+            get => adaptiveStartMinSamples;
+            set => adaptiveStartMinSamples = Mathf.Clamp(value, 256, 8192);
+        }
+
+        public int AdaptiveStartMaxWaitMs
+        {
+            get => adaptiveStartMaxWaitMs;
+            set => adaptiveStartMaxWaitMs = Mathf.Clamp(value, 20, 10000);
+        }
+
+        public int BufferCapacitySamples => bufferCapacitySamples;
+
+        public void BindLipSyncBridge(OVRLipSyncChunkBridge bridge)
+        {
+            lipSyncBridge = bridge;
+        }
+
         public void MarkStreamingComplete(int producerGeneration)
         {
             if (!isInitialized || producerGeneration != generationId)
                 return;
 
             producerCompleted = true;
+            MVP.Conversation.LipSyncTelemetry.Enqueue(MVP.Conversation.LipSyncTelemetry.EventId.ProducerCompleted, -1, generationId, 0);
         }
 
         private void OnEnable()
@@ -116,6 +167,8 @@ namespace MVP.Conversation
             audioStartedLogged = false;
             playbackFinishedLogged = false;
             lastReportedAvailableSamples = -1;
+            hasFirstWrite = false;
+            firstWriteAtMs = 0;
 
             buffer.Clear();
 
@@ -180,6 +233,12 @@ namespace MVP.Conversation
             }
 
             int availableNow = buffer.AvailableSamples;
+            if (written > 0 && !hasFirstWrite)
+            {
+                hasFirstWrite = true;
+                firstWriteAtMs = DateTime.UtcNow.Ticks / TimeSpan.TicksPerMillisecond;
+            }
+
             if (written > 0 && Mathf.Abs(availableNow - lastReportedAvailableSamples) >= prebufferSamples)
             {
                 lastReportedAvailableSamples = availableNow;
@@ -188,6 +247,9 @@ namespace MVP.Conversation
                     $"written={written}, available={availableNow}, free={buffer.FreeSamples}, " +
                     $"producerCompleted={producerCompleted}, playbackFinished={playbackFinished}");
             }
+
+            // Telemetry: log writes (value = written samples)
+            MVP.Conversation.LipSyncTelemetry.Enqueue(MVP.Conversation.LipSyncTelemetry.EventId.AudioWrite, -1, sampleGeneration, written);
 
             return written;
         }
@@ -205,19 +267,33 @@ namespace MVP.Conversation
             if (scratchMono == null || scratchMono.Length < frames)
                 scratchMono = new float[frames];
 
+            int available = buffer.AvailableSamples;
             int startThreshold = prebufferSamples + startSafetySamples;
-            if (!audioStarted && buffer.AvailableSamples >= startThreshold)
+            bool strictReady = available >= startThreshold;
+            bool adaptiveReady = false;
+
+            if (!strictReady && enableAdaptiveStart && hasFirstWrite && available >= adaptiveStartMinSamples)
+            {
+                long waitedMs = (DateTime.UtcNow.Ticks / TimeSpan.TicksPerMillisecond) - firstWriteAtMs;
+                adaptiveReady = waitedMs >= adaptiveStartMaxWaitMs || producerCompleted;
+            }
+
+            if (!audioStarted && (strictReady || adaptiveReady))
             {
                 audioStarted = true;
                 pendingAudioBegan = true;
 
                 Debug.Log(
                     $"[RealtimeAudioPlayer] Audio started generation={generationId}, " +
-                    $"available={buffer.AvailableSamples}, prebuffer={prebufferSamples}, " +
-                    $"safety={startSafetySamples}, threshold={startThreshold}");
+                    $"available={available}, prebuffer={prebufferSamples}, " +
+                    $"safety={startSafetySamples}, threshold={startThreshold}, " +
+                    $"adaptive={adaptiveReady}, min={adaptiveStartMinSamples}, waitMs={adaptiveStartMaxWaitMs}");
+
+                MVP.Conversation.LipSyncTelemetry.Enqueue(MVP.Conversation.LipSyncTelemetry.EventId.AudioStarted, -1, generationId, available);
             }
 
             Array.Clear(scratchMono, 0, frames);
+            int availableBeforeRead = buffer.AvailableSamples;
             buffer.Read(scratchMono);
 
             int idx = 0;
@@ -227,6 +303,10 @@ namespace MVP.Conversation
                 for (int c = 0; c < channels; c++)
                     data[idx++] = s;
             }
+
+            // Keep viseme processing aligned with audible playback: skip silent pre-roll before audio starts.
+            if (lipSyncBridge != null && audioStarted && availableBeforeRead > 0)
+                lipSyncBridge.ProcessPlaybackSamples(scratchMono, frames, generationId);
 
             if (producerCompleted && buffer.AvailableSamples == 0)
             {

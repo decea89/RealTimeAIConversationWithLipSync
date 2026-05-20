@@ -73,6 +73,12 @@ namespace MVP.Conversation
         [Tooltip("Transición entre chunks (ms). 0=sin suavizado. 20-50=recomendado.")]
         private float chunkCrossfadeMs = 35f;
 
+        // Public runtime accessors
+        public bool VerboseLogging { get => verboseLogging; set => verboseLogging = value; }
+        public bool EnableTelemetry { get => enableTelemetry; set => enableTelemetry = value; }
+        public float EnqueueStallTimeoutSeconds { get => enqueueStallTimeoutSeconds; set => enqueueStallTimeoutSeconds = Mathf.Max(0f, value); }
+        public float ChunkCrossfadeMs { get => chunkCrossfadeMs; set => chunkCrossfadeMs = Mathf.Max(0f, value); }
+
         private ITTSService innerTtsService;
         private readonly List<RealtimeTTSHandle> activeHandles = new();
         private int generationId;
@@ -170,6 +176,7 @@ namespace MVP.Conversation
             };
 
             realtimeAudioPlayer.ResetForNewGeneration(localGeneration, wrappedOnAudioBegan);
+            realtimeAudioPlayer.BindLipSyncBridge(lipSyncBridge);
 
             if (lipSyncBridge != null)
                 lipSyncBridge.ResetForNewGeneration(localGeneration);
@@ -247,7 +254,10 @@ namespace MVP.Conversation
             activeHandles.Clear();
 
             if (realtimeAudioPlayer != null)
+            {
                 realtimeAudioPlayer.StopAndClear();
+                realtimeAudioPlayer.BindLipSyncBridge(null);
+            }
 
             if (lipSyncBridge != null)
                 lipSyncBridge.StopAndClear();
