@@ -14,6 +14,9 @@ namespace MVP.Conversation
         private int availableSamples;
         private long totalSamplesWritten;
         private long totalSamplesRead;
+        private float lastSample = 0f;
+        // Crossfade duration in milliseconds to smooth transitions after underruns
+        private int underrunCrossfadeMs = 12;
 
         public int AvailableSamples
         {
@@ -67,6 +70,7 @@ namespace MVP.Conversation
                 totalSamplesWritten = 0;
                 totalSamplesRead = 0;
                 Array.Clear(buffer, 0, buffer.Length);
+                lastSample = 0f;
             }
         }
 
@@ -78,12 +82,43 @@ namespace MVP.Conversation
             lock (locker)
             {
                 int writable = Mathf.Min(sampleCount, capacity - availableSamples);
+
+                // If buffer was empty and we have a lastSample, apply a short crossfade
+                int rampSamples = 0;
+                bool crossfadeApplied = false;
+                if (availableSamples == 0 && lastSample != 0f && writable > 0)
+                {
+                    int sr = AudioSettings.outputSampleRate;
+                    rampSamples = Mathf.CeilToInt(sr * (underrunCrossfadeMs / 1000f));
+                    rampSamples = Mathf.Min(rampSamples, writable);
+                }
+
                 for (int i = 0; i < writable; i++)
                 {
-                    buffer[writePos] = samples[offset + i];
+                    float val = 0f;
+                    if (i < rampSamples)
+                    {
+                        float f = (float)(i + 1) / (float)rampSamples; // ramp from lastSample -> sample
+                        float src = samples[offset + i];
+                        val = lastSample * (1f - f) + src * f;
+                    }
+                    if (!crossfadeApplied && rampSamples > 0 && i == rampSamples - 1)
+                        crossfadeApplied = true;
+                    else
+                    {
+                        val = samples[offset + i];
+                    }
+
+                    buffer[writePos] = val;
                     writePos = (writePos + 1) % capacity;
                     availableSamples++;
                     totalSamplesWritten++;
+                    lastSample = val;
+                }
+
+                if (crossfadeApplied)
+                {
+                    MVP.Conversation.LipSyncTelemetry.Enqueue(MVP.Conversation.LipSyncTelemetry.EventId.BufferCrossfadeApplied, -1, -1, rampSamples);
                 }
 
                 return writable;
@@ -97,6 +132,7 @@ namespace MVP.Conversation
 
             lock (locker)
             {
+                bool underrunOccurred = false;
                 for (int i = 0; i < destination.Length; i++)
                 {
                     if (availableSamples > 0)
@@ -105,11 +141,19 @@ namespace MVP.Conversation
                         readPos = (readPos + 1) % capacity;
                         availableSamples--;
                         totalSamplesRead++;
+                        lastSample = destination[i];
                     }
                     else
                     {
-                        destination[i] = 0f;
+                        // Buffer underrun: repeat last known sample to smooth gaps
+                        destination[i] = lastSample;
+                        underrunOccurred = true;
                     }
+                }
+
+                if (underrunOccurred)
+                {
+                    MVP.Conversation.LipSyncTelemetry.Enqueue(MVP.Conversation.LipSyncTelemetry.EventId.BufferUnderrun, -1, -1, destination.Length);
                 }
             }
         }
