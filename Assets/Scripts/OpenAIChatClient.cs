@@ -10,45 +10,56 @@ namespace MVP.Conversation
 {
     public class OpenAIChatClient : MonoBehaviour, IChatService
     {
-        [Header("OpenAI Chat")]
-        [SerializeField]
-        [Tooltip("Tu API key de OpenAI. Mantener privado.")]
-        private string apiKey = "YOUR_OPENAI_API_KEY";
-        
-        [SerializeField]
-        [Tooltip("Endpoint de OpenAI para chat. No cambiar a menos que uses proxy.")]
-        private string endpoint = "https://api.openai.com/v1/chat/completions";
-        
-        [SerializeField]
-        [Tooltip("Modelo de chat a usar. 'gpt-4o-mini' es rápido y barato.")]
-        private string model = "gpt-4o-mini";
-        
-        [Header("Request Guards")]
-        [SerializeField]
-        [Range(5, 180)]
-        [Tooltip("Timeout chat (s). Si respuestas largas se cortan, aumentar a 90-120.")]
-        private int requestTimeoutSeconds = 90;
+        private const string ApiKeyEnvironmentVariable = "OPENAI_API_KEY";
+        private string apiKey = string.Empty;
 
-        [SerializeField]
-        [TextArea(3, 8)]
-        [Tooltip("Instrucciones al modelo. Define personalidad y estilo de respuesta.")]
-        private string systemPrompt =
-            "You are a historical character speaking inside a VR experience. " +
-            "Reply briefly, clearly, and with strong personality. " +
-            "Default to one short sentence under 25 words unless the user explicitly asks for more detail.";
+        private static ConversationSettings Settings => ConversationSettings.Instance;
 
-        [SerializeField]
-        [Range(0f, 2f)]
-        [Tooltip("Creatividad (0=determinista, 2=muy creativo). 0.5-0.7=conversación natural.")]
-        private float temperature = 0.5f;
-        
-        [SerializeField]
-        [Range(10, 300)]
-        [Tooltip("Máximo de tokens en respuesta. Más alto=respuestas más largas pero más costo.")]
-        private int maxCompletionTokens = 60;
+        private string endpoint
+        {
+            get => Settings.Chat.endpoint;
+            set => Settings.Chat.endpoint = value;
+        }
+
+        private string model
+        {
+            get => Settings.Chat.model;
+            set => Settings.Chat.model = value;
+        }
+
+        private int requestTimeoutSeconds
+        {
+            get => Settings.Chat.requestTimeoutSeconds;
+            set => Settings.Chat.requestTimeoutSeconds = value;
+        }
+
+        private string systemPrompt
+        {
+            get => Settings.Chat.systemPrompt;
+            set => Settings.Chat.systemPrompt = value;
+        }
+
+        private float temperature
+        {
+            get => Settings.Chat.temperature;
+            set => Settings.Chat.temperature = value;
+        }
+
+        private int maxCompletionTokens
+        {
+            get => Settings.Chat.maxCompletionTokens;
+            set => Settings.Chat.maxCompletionTokens = value;
+        }
 
         public IEnumerator RequestChat(string userMessage, Action<string, string> onComplete)
         {
+            string resolvedApiKey = GetApiKey();
+            if (string.IsNullOrWhiteSpace(resolvedApiKey))
+            {
+                onComplete?.Invoke(null, $"OpenAIChatClient: API key no configurada. Define {ApiKeyEnvironmentVariable}.");
+                yield break;
+            }
+
             var body = new ChatCompletionRequest
             {
                 model = model,
@@ -69,7 +80,7 @@ namespace MVP.Conversation
             request.downloadHandler = new DownloadHandlerBuffer();
             request.timeout = Mathf.Max(5, requestTimeoutSeconds);
             request.SetRequestHeader("Content-Type", "application/json");
-            request.SetRequestHeader("Authorization", $"Bearer {apiKey}");
+            request.SetRequestHeader("Authorization", $"Bearer {resolvedApiKey}");
 
             yield return request.SendWebRequest();
 
@@ -88,14 +99,14 @@ namespace MVP.Conversation
             }
             catch (Exception e)
             {
-                onComplete?.Invoke(null, "Error parseando JSON de OpenAI Chat: " + e.Message + "\nRAW:\n" + raw);
+                onComplete?.Invoke(null, "Error parsing OpenAI Chat JSON: " + e.Message + "\nRAW:\n" + raw);
                 yield break;
             }
 
             string content = parsed?.choices?[0]?.message?.content;
             if (string.IsNullOrWhiteSpace(content))
             {
-                onComplete?.Invoke(null, "Respuesta vacía o inválida de OpenAI Chat.\nRAW:\n" + raw);
+                onComplete?.Invoke(null, "Empty or invalid OpenAI Chat response.\nRAW:\n" + raw);
                 yield break;
             }
 
@@ -104,6 +115,13 @@ namespace MVP.Conversation
 
         public IEnumerator RequestChatRich(string userMessage, Action<ChatServiceResult, string> onComplete)
         {
+            string resolvedApiKey = GetApiKey();
+            if (string.IsNullOrWhiteSpace(resolvedApiKey))
+            {
+                onComplete?.Invoke(null, $"OpenAIChatClient: API key not configured. Set {ApiKeyEnvironmentVariable}.");
+                yield break;
+            }
+
             string responseText = null;
             string error = null;
             string rawJson = null;
@@ -127,7 +145,7 @@ namespace MVP.Conversation
             request.uploadHandler = new UploadHandlerRaw(bodyRaw);
             request.downloadHandler = new DownloadHandlerBuffer();
             request.SetRequestHeader("Content-Type", "application/json");
-            request.SetRequestHeader("Authorization", $"Bearer {apiKey}");
+            request.SetRequestHeader("Authorization", $"Bearer {resolvedApiKey}");
 
             yield return request.SendWebRequest();
 
@@ -146,14 +164,14 @@ namespace MVP.Conversation
             }
             catch (Exception e)
             {
-                onComplete?.Invoke(null, "Error parseando JSON de OpenAI Chat: " + e.Message + "\nRAW:\n" + rawJson);
+                onComplete?.Invoke(null, "Error parsing OpenAI Chat JSON: " + e.Message + "\nRAW:\n" + rawJson);
                 yield break;
             }
 
             responseText = parsed?.choices?[0]?.message?.content;
             if (string.IsNullOrWhiteSpace(responseText))
             {
-                onComplete?.Invoke(null, "Respuesta vacía o inválida de OpenAI Chat.\nRAW:\n" + rawJson);
+                onComplete?.Invoke(null, "Empty or invalid OpenAI Chat response.\nRAW:\n" + rawJson);
                 yield break;
             }
 
@@ -164,6 +182,11 @@ namespace MVP.Conversation
                 intentTags = new List<IntentTag>(),
                 rawJson = rawJson
             }, null);
+        }
+
+        private string GetApiKey()
+        {
+            return ApiKeyProvider.Resolve(apiKey, ApiKeyEnvironmentVariable, nameof(OpenAIChatClient));
         }
 
         [Serializable]

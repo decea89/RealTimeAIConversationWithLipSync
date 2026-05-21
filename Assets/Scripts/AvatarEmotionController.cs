@@ -6,17 +6,17 @@ namespace MVP.Conversation
     public class AvatarEmotionController : MonoBehaviour
     {
         [SerializeField]
-        [Tooltip("Animator del avatar. Si vacío, busca en hijos.")]
+        [Tooltip("Avatar Animator. If empty, searches in children.")]
         private Animator animator;
 
-        // Nombres de parámetros en el Animator
+        // Animator parameter names
         [Header("Animator Parameters")]
         [SerializeField]
-        [Tooltip("Nombre del parámetro de emoción en Animator (p.ej. 'Emotion'). Sync con Animator.")]
+        [Tooltip("Emotion parameter name in the Animator (e.g. 'Emotion'). Must match the Animator.")]
         private string emotionParam = "Emotion";
         
         [SerializeField]
-        [Tooltip("Nombre del parámetro de intención en Animator (p.ej. 'Intent'). Sync con Animator.")]
+        [Tooltip("Intent parameter name in the Animator (e.g. 'Intent'). Must match the Animator.")]
         private string intentParam = "Intent";
 
         private void Awake()
@@ -33,13 +33,13 @@ namespace MVP.Conversation
             int emotionInt = EmotionToInt(emotion);
             animator.SetInteger(emotionParam, emotionInt);
 
-            // intent principal: el primero de la lista, si existe
+            // Main intent: the first item in the list, if present
             var mainIntent = intents != null && intents.Count > 0 ? intents[0] : IntentTag.Unknown;
             int intentInt = IntentToInt(mainIntent);
             animator.SetInteger(intentParam, intentInt);
 
-            // aquí puedes también disparar triggers si quieres
-            // por ejemplo: animator.SetTrigger("React");
+            // You can also trigger Animator events here if needed.
+            // For example: animator.SetTrigger("React");
         }
 
         private int EmotionToInt(CharacterEmotion emotion)

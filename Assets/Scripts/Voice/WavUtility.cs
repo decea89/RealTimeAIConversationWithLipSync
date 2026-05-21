@@ -64,7 +64,7 @@ public static AudioClip ToAudioClip(byte[] wavBytes, string clipName = "wav")
     string riff = Encoding.UTF8.GetString(reader.ReadBytes(4));
     if (riff != "RIFF")
     {
-        Debug.LogError("[WavUtility] Cabecera RIFF inválida.");
+        Debug.LogError("[WavUtility] Invalid RIFF header.");
         return null;
     }
 
@@ -73,7 +73,7 @@ public static AudioClip ToAudioClip(byte[] wavBytes, string clipName = "wav")
     string wave = Encoding.UTF8.GetString(reader.ReadBytes(4));
     if (wave != "WAVE")
     {
-        Debug.LogError("[WavUtility] Cabecera WAVE inválida.");
+        Debug.LogError("[WavUtility] Invalid WAVE header.");
         return null;
     }
 
@@ -107,7 +107,7 @@ public static AudioClip ToAudioClip(byte[] wavBytes, string clipName = "wav")
         {
             if (chunkSize < 16)
             {
-                Debug.LogError($"[WavUtility] chunk fmt demasiado pequeño: {chunkSize} bytes.");
+                Debug.LogError($"[WavUtility] fmt chunk too small: {chunkSize} bytes.");
                 return null;
             }
 
@@ -136,14 +136,14 @@ public static AudioClip ToAudioClip(byte[] wavBytes, string clipName = "wav")
 
         if (reader.BaseStream.Position <= chunkHeaderPos)
         {
-            Debug.LogError("[WavUtility] El parser no avanzó, evitando bucle infinito.");
+            Debug.LogError("[WavUtility] Parser did not advance, preventing an infinite loop.");
             break;
         }
     }
 
     if (audioFormat != 1)
     {
-        Debug.LogError($"[WavUtility] Solo se soporta WAV PCM sin compresión. audioFormat={audioFormat}");
+        Debug.LogError($"[WavUtility] Only uncompressed PCM WAV is supported. audioFormat={audioFormat}");
         return null;
     }
 
@@ -155,7 +155,7 @@ public static AudioClip ToAudioClip(byte[] wavBytes, string clipName = "wav")
 
     if (channels <= 0 || sampleRate <= 0 || dataChunk == null || dataChunk.Length == 0)
     {
-        Debug.LogError("[WavUtility] WAV incompleto o sin datos de audio válidos.");
+        Debug.LogError("[WavUtility] Incomplete WAV or no valid audio data.");
         return null;
     }
 

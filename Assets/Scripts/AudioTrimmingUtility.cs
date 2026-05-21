@@ -4,9 +4,9 @@ namespace MVP.Conversation
 {
     public static class AudioTrimmingUtility
     {
-        // levelThreshold: amplitud mínima para considerar que hay voz (0-1)
-        // minSegmentSeconds: si la ventana con voz es menor, no se recorta
-        // extraPaddingSeconds: margen extra antes y después de la ventana con voz
+        // levelThreshold: minimum amplitude to consider a sample voiced (0-1)
+        // minSegmentSeconds: if the voiced window is shorter than this, do not trim
+        // extraPaddingSeconds: extra padding before and after the voiced window
         public static AudioClip TrimSilence(
             AudioClip source,
             float levelThreshold = 0.01f,
@@ -26,7 +26,7 @@ namespace MVP.Conversation
             int firstSample = -1;
             int lastSample = -1;
 
-            // Buscar primer sample “con voz”
+            // Find the first voiced sample
             for (int i = 0; i < totalSamples; i++)
             {
                 if (Mathf.Abs(data[i]) >= levelThreshold)
@@ -37,9 +37,9 @@ namespace MVP.Conversation
             }
 
             if (firstSample == -1)
-                return null; // todo silencio
+                return null; // all silence
 
-            // Buscar último sample “con voz”
+            // Find the last voiced sample
             for (int i = totalSamples - 1; i >= 0; i--)
             {
                 if (Mathf.Abs(data[i]) >= levelThreshold)
@@ -57,7 +57,7 @@ namespace MVP.Conversation
             int segmentLength = lastSample - firstSample;
 
             if (segmentLength < minSegmentSamples)
-                return null; // segmento muy corto, no recortamos
+                return null; // segment too short, do not trim
 
             int paddingSamples = Mathf.CeilToInt(extraPaddingSeconds * samplesPerSecond);
             int trimmedStart = Mathf.Max(0, firstSample - paddingSamples);

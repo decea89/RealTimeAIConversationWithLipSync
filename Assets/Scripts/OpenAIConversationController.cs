@@ -11,6 +11,8 @@ namespace MVP.Conversation
 {
     public class OpenAIConversationController : MonoBehaviour
     {
+        private static ConversationSettings Settings => ConversationSettings.Instance;
+
         [Header("Dependencies")]
         [SerializeField]
         [Tooltip("Componente con IChatService (OpenAIChatClient). Genera respuestas de IA.")]
@@ -21,59 +23,70 @@ namespace MVP.Conversation
         private MonoBehaviour sttServiceBehaviour;
         
         [SerializeField]
-        [Tooltip("Componente con IRealtimeTTSService (RealtimeOpenAITTSClient). Convierte respuesta a audio streaming.")]
+        [Tooltip("Component with IRealtimeTTSService (RealtimeOpenAITTSClient). Converts the response into streamed audio.")]
         private MonoBehaviour realtimeTtsServiceBehaviour;
         
         [SerializeField]
-        [Tooltip("Componente MicrophoneRecorder. Captura audio del usuario.")]
+        [Tooltip("MicrophoneRecorder component. Captures user audio.")]
         private MicrophoneRecorder microphoneRecorder;
         
         [SerializeField]
-        [Tooltip("AudioSource para reproducción. Se reutiliza para todas las respuestas.")]
+        [Tooltip("Playback AudioSource. Reused for all responses.")]
         private AudioSource avatarAudioSource;
         
         [SerializeField]
-        [Tooltip("Componente AvatarEmotionController (opcional). Sincroniza emociones con audio.")]
+        [Tooltip("AvatarEmotionController component (optional). Synchronizes emotions with audio.")]
         private AvatarEmotionController emotionController;
         
         [SerializeField]
-        [Tooltip("Panel de debug en mundo. Muestra logs y timing de conversación.")]
+        [Tooltip("World-space debug panel. Shows logs and conversation timing.")]
         private WorldSpaceDebugPanelController worldSpaceDebugPanel;
 
-        [Header("Push To Talk")]
-        [SerializeField]
-        [Tooltip("Habilitar PTT con tecla de teclado (Space por defecto). Útil para testing.")]
-        private bool useKeyboardDebugShortcut = true;
-        
-        [SerializeField]
-        [Tooltip("Tecla para activar PTT (Space=micrófono, Tab=opción B, etc).")]
-        private KeyCode keyboardDebugKey = KeyCode.Space;
-        
-        [SerializeField]
-        [Tooltip("Habilitar PTT con XRI (mando VR). Requiere InputSystem.")]
-        private bool useXriPushToTalk = true;
-        
-        [SerializeField]
-        [Tooltip("Acción de Input para PTT VR. Mapear en InputSystem.")]
-        private InputActionReference pushToTalkAction;
-        
-        [SerializeField]
-        [Range(0.01f, 1.0f)]
-        [Tooltip("Duración mínima para registrar como PTT (s). Evita activaciones accidentales.")]
-        private float minimumHoldSeconds = 0.12f;
-        
-        [SerializeField]
-        [Tooltip("Permitir interrumpir audio de IA durante reproducción. Si OFF, espera a que termine.")]
-        private bool allowBargeInWhileSpeaking = true;
+        private bool useKeyboardDebugShortcut
+        {
+            get => Settings.ConversationController.useKeyboardDebugShortcut;
+            set => Settings.ConversationController.useKeyboardDebugShortcut = value;
+        }
 
-        [Header("Debug Output")]
+        private KeyCode keyboardDebugKey
+        {
+            get => Settings.ConversationController.keyboardDebugKey;
+            set => Settings.ConversationController.keyboardDebugKey = value;
+        }
+
+        private bool useXriPushToTalk
+        {
+            get => Settings.ConversationController.useXriPushToTalk;
+            set => Settings.ConversationController.useXriPushToTalk = value;
+        }
+
         [SerializeField]
-        [Tooltip("Incluir texto de IA en métricas de timing. Útil para debugging.")]
-        private bool includeAssistantTextInMetrics = true;
-        
-        [SerializeField]
-        [Tooltip("Incluir fuentes/backends en info. Muestra qué servicios se usaron.")]
-        private bool includeSourcesInBackendInfo = true;
+        [Tooltip("Input action for VR push-to-talk. Map it in the Input System.")]
+        private InputActionReference pushToTalkAction;
+
+        private float minimumHoldSeconds
+        {
+            get => Settings.ConversationController.minimumHoldSeconds;
+            set => Settings.ConversationController.minimumHoldSeconds = value;
+        }
+
+        private bool allowBargeInWhileSpeaking
+        {
+            get => Settings.ConversationController.allowBargeInWhileSpeaking;
+            set => Settings.ConversationController.allowBargeInWhileSpeaking = value;
+        }
+
+        private bool includeAssistantTextInMetrics
+        {
+            get => Settings.ConversationController.includeAssistantTextInMetrics;
+            set => Settings.ConversationController.includeAssistantTextInMetrics = value;
+        }
+
+        private bool includeSourcesInBackendInfo
+        {
+            get => Settings.ConversationController.includeSourcesInBackendInfo;
+            set => Settings.ConversationController.includeSourcesInBackendInfo = value;
+        }
 
         private IChatService chatService;
         private ISTTService sttService;
@@ -212,7 +225,7 @@ namespace MVP.Conversation
             if (!microphoneRecorder.IsRecording)
             {
                 UpdatePanelState("Error");
-                UpdatePanelBackendInfo("No se pudo iniciar la grabación del micrófono.");
+                UpdatePanelBackendInfo("Could not start microphone recording.");
                 return;
             }
 
@@ -237,7 +250,7 @@ namespace MVP.Conversation
                     microphoneRecorder.StopRecording();
 
                 UpdatePanelState("Idle");
-                UpdatePanelBackendInfo("Pulsa y mantén un poco más para grabar.");
+                UpdatePanelBackendInfo("Press and hold a little longer to record.");
                 return;
             }
 
@@ -245,7 +258,7 @@ namespace MVP.Conversation
             if (clip == null)
             {
                 UpdatePanelState("Error");
-                UpdatePanelBackendInfo("No se pudo obtener un AudioClip válido del micrófono.");
+                UpdatePanelBackendInfo("Could not obtain a valid AudioClip from the microphone.");
                 return;
             }
 
@@ -269,7 +282,7 @@ namespace MVP.Conversation
             worldSpaceDebugPanel?.SetUserTranscript("-");
             worldSpaceDebugPanel?.SetAssistantTranscript("-");
             worldSpaceDebugPanel?.SetMetrics("-");
-            UpdatePanelBackendInfo($"Nuevo usuario activo. Session ID: {SessionManager.CurrentSessionId}");
+                UpdatePanelBackendInfo($"New active user. Session ID: {SessionManager.CurrentSessionId}");
         }
 
         private void InterruptAudioAndConversation(string reason)
@@ -339,7 +352,7 @@ namespace MVP.Conversation
 
             if (!string.IsNullOrEmpty(chatError) || chatResult == null || string.IsNullOrWhiteSpace(chatResult.responseText))
             {
-                result.error = string.IsNullOrEmpty(chatError) ? "Respuesta de chat vacía." : chatError;
+                result.error = string.IsNullOrEmpty(chatError) ? "Empty chat response." : chatError;
                 UpdatePanelState("Error");
                 UpdatePanelBackendInfo(result.error);
                 isRunningConversation = false;
@@ -379,7 +392,7 @@ namespace MVP.Conversation
 
             if (clip == null)
             {
-                result.error = "No se grabó audio desde el micrófono.";
+                result.error = "No audio was recorded from the microphone.";
                 UpdatePanelState("Error");
                 UpdatePanelBackendInfo(result.error);
                 isRunningConversation = false;
@@ -422,7 +435,7 @@ namespace MVP.Conversation
 
             if (!string.IsNullOrEmpty(sttError) || string.IsNullOrWhiteSpace(userText))
             {
-                result.error = string.IsNullOrEmpty(sttError) ? "La transcripción de STT está vacía." : sttError;
+                result.error = string.IsNullOrEmpty(sttError) ? "The STT transcription is empty." : sttError;
                 UpdatePanelState("Error");
                 UpdatePanelBackendInfo(result.error);
                 isRunningConversation = false;
@@ -459,7 +472,7 @@ namespace MVP.Conversation
 
             if (!string.IsNullOrEmpty(chatError) || chatResult == null || string.IsNullOrWhiteSpace(chatResult.responseText))
             {
-                result.error = string.IsNullOrEmpty(chatError) ? "Respuesta de chat vacía." : chatError;
+                result.error = string.IsNullOrEmpty(chatError) ? "Empty chat response." : chatError;
                 UpdatePanelState("Error");
                 UpdatePanelBackendInfo(result.error);
                 isRunningConversation = false;
@@ -493,7 +506,7 @@ namespace MVP.Conversation
         {
             if (string.IsNullOrWhiteSpace(result.assistantText))
             {
-                result.error = "assistantText está vacío, no hay nada que sintetizar.";
+                result.error = "assistantText is empty, there is nothing to synthesize.";
                 UpdatePanelState("Error");
                 UpdatePanelBackendInfo(result.error);
                 yield break;
@@ -542,7 +555,7 @@ namespace MVP.Conversation
 
             if (handle == null)
             {
-                result.error = "No se pudo iniciar el stream de TTS.";
+                result.error = "Could not start the TTS stream.";
                 UpdatePanelState("Error");
                 UpdatePanelBackendInfo(result.error);
                 yield break;
@@ -551,8 +564,8 @@ namespace MVP.Conversation
             float safetyTimeout = 120f;
             float endTime = Time.realtimeSinceStartup + safetyTimeout;
 
-            // Solo esperamos a que termine la PRODUCCIÓN de audio (enqueue),
-            // no a que se drene todo el buffer.
+            // Only wait for audio production (enqueue) to finish,
+            // not for the entire buffer to drain.
             while (!handle.IsCompleted && Time.realtimeSinceStartup < endTime)
             {
                 if (!IsTurnCurrent(turnId))
@@ -599,7 +612,7 @@ namespace MVP.Conversation
                 yield break;
             }
 
-            // PlaybackEnd se entiende aquí como "hemos terminado este turno de TTS"
+            // PlaybackEnd here means "we have finished this TTS turn"
             result.timing.MarkPlaybackEnd();
             Debug.Log($"[OpenAIConversationController] TTS end turn={turnId}, playbackStarted={playbackStarted}, handleCompleted={handle.IsCompleted}");
             worldSpaceDebugPanel?.AppendTelemetryEvent($"Realtime playback completed turn={turnId}");

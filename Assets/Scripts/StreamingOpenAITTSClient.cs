@@ -10,97 +10,118 @@ namespace MVP.Conversation
 {
     public class StreamingOpenAITTSClient : MonoBehaviour, IStreamingTTSService
     {
-        [Header("OpenAI TTS")]
-        [SerializeField]
-        [Tooltip("Tu API key de OpenAI. Mantener privado.")]
-        private string apiKey = "YOUR_OPENAI_API_KEY";
-        
-        [SerializeField]
-        [Tooltip("Endpoint de OpenAI para TTS. No cambiar a menos que uses proxy.")]
-        private string endpoint = "https://api.openai.com/v1/audio/speech";
-        
-        [SerializeField]
-        [Tooltip("Modelo TTS a usar. 'gpt-4o-mini-tts' es el default rápido.")]
-        private string model = "gpt-4o-mini-tts";
-        
-        [SerializeField]
-        [Tooltip("Voz (coral/sage/shimmer/echo/alloy). 'coral' es cálida y natural.")]
-        private string voice = "coral";
+        private const string ApiKeyEnvironmentVariable = "OPENAI_API_KEY";
+        private string apiKey = string.Empty;
 
-        [SerializeField]
-        [TextArea(2, 5)]
-        [Tooltip("Instrucciones al modelo sobre cómo sonar. Afecta velocidad, acento y tono.")]
-        private string instructions =
-            "Speak in warm, natural Spanish, with clear diction and a conversational tone suitable for a historical character in VR.";
+        private static ConversationSettings Settings => ConversationSettings.Instance;
 
-        [Header("Voice Tuning")]
-        [SerializeField]
-        [Range(0.25f, 4.0f)]
-        [Tooltip("Velocidad de voz. 0.5=lento y profundo. 1.0=normal. 2.0=rápido y agudo.")]
-        private float speed = 1.0f;
+        private string endpoint
+        {
+            get => Settings.StreamingOpenAiTts.endpoint;
+            set => Settings.StreamingOpenAiTts.endpoint = value;
+        }
 
-        [Header("PCM Stream Config")]
-        [SerializeField]
-        [Range(16000, 48000)]
-        [Tooltip("Frecuencia de muestreo (Hz). Más bajo=demora pero menos CPU. Típico: 24000.")]
-        private int sampleRate = 24000;
-        
-        [SerializeField]
-        [Tooltip("Canales (1=mono). Mantener en 1 para VR.")]
-        private int channels = 1;
-        
-        [SerializeField]
-        [Range(10, 120)]
-        [Tooltip("Duración max audio (s). Más alto=buffer seguro para respuestas largas.")]
-        private int maxClipSeconds = 60;
+        private string model
+        {
+            get => Settings.StreamingOpenAiTts.model;
+            set => Settings.StreamingOpenAiTts.model = value;
+        }
 
-        [SerializeField]
-        [Range(5, 180)]
-        [Tooltip("Timeout de la petición TTS (s). Súbelo si respuestas largas empiezan a cortar o fallar después de iniciar el audio; bájalo solo si quieres abortar antes.")]
-        private int requestTimeoutSeconds = 90;
+        private string voice
+        {
+            get => Settings.StreamingOpenAiTts.voice;
+            set => Settings.StreamingOpenAiTts.voice = value;
+        }
 
-        [SerializeField]
-        [Range(1f, 15f)]
-        [Tooltip("Tiempo máximo esperando el primer chunk PCM antes de abortar el stream. Útil para detectar arranques muertos sin tocar la reproducción normal.")]
-        private float firstChunkTimeoutSeconds = 4f;
+        private string instructions
+        {
+            get => Settings.StreamingOpenAiTts.instructions;
+            set => Settings.StreamingOpenAiTts.instructions = value;
+        }
 
-        [SerializeField]
-        [Range(1f, 15f)]
-        [Tooltip("Tiempo máximo sin recibir PCM una vez que el stream ya empezó. Pensado para diagnóstico; no modifica el audio por sí mismo.")]
-        private float chunkSilenceTimeoutSeconds = 2.5f;
+        private float speed
+        {
+            get => Settings.StreamingOpenAiTts.speed;
+            set => Settings.StreamingOpenAiTts.speed = value;
+        }
 
-        [SerializeField]
-        [Range(0.05f, 2.0f)]
-        [Tooltip("Buffer inicial (s) antes de reproducir. Más alto=seguro. Más bajo=rápido pero riesgo de cortes.")]
-        private float prebufferSeconds = 0.35f;
-        
-        [SerializeField]
-        [Range(0.5f, 10.0f)]
-        [Tooltip("Tiempo drenar buffer (s) al final. Espera para asegurar reproducción completa.")]
-        private float drainGraceSeconds = 2.0f;
+        private int sampleRate
+        {
+            get => Settings.StreamingOpenAiTts.sampleRate;
+            set => Settings.StreamingOpenAiTts.sampleRate = value;
+        }
 
-        [Header("Debug")]
-        [SerializeField]
-        [Tooltip("Mostrar logs de chunks PCM en consola. Útil para diagnosticar problemas.")]
-        private bool logChunks = true;
+        private int channels
+        {
+            get => Settings.StreamingOpenAiTts.channels;
+            set => Settings.StreamingOpenAiTts.channels = value;
+        }
 
-        [SerializeField]
-        [Range(0.08f, 1.0f)]
-        [Tooltip("Gap mínimo entre chunks para mostrar un warning. Sube este valor para reducir ruido de consola cuando el streaming está aceptable.")]
-        private float largeChunkGapWarningSeconds = 0.25f;
+        private int maxClipSeconds
+        {
+            get => Settings.StreamingOpenAiTts.maxClipSeconds;
+            set => Settings.StreamingOpenAiTts.maxClipSeconds = value;
+        }
 
-        [Header("Diagnostics")]
-        [SerializeField]
-        [Tooltip("Capturar PCM para crear clip debug. Útil para auditar calidad.")]
-        private bool captureFullPcmForDebug = false;
-        
-        [SerializeField]
-        [Tooltip("Mostrar duración esperada del audio en logs.")]
-        private bool logExpectedDuration = false;
-        
-        [SerializeField]
-        [Tooltip("Crear AudioClip debug al terminar. Acumula memoria en sesiones largas.")]
-        private bool buildDebugClipOnComplete = false;
+        private int requestTimeoutSeconds
+        {
+            get => Settings.StreamingOpenAiTts.requestTimeoutSeconds;
+            set => Settings.StreamingOpenAiTts.requestTimeoutSeconds = value;
+        }
+
+        private float firstChunkTimeoutSeconds
+        {
+            get => Settings.StreamingOpenAiTts.firstChunkTimeoutSeconds;
+            set => Settings.StreamingOpenAiTts.firstChunkTimeoutSeconds = value;
+        }
+
+        private float chunkSilenceTimeoutSeconds
+        {
+            get => Settings.StreamingOpenAiTts.chunkSilenceTimeoutSeconds;
+            set => Settings.StreamingOpenAiTts.chunkSilenceTimeoutSeconds = value;
+        }
+
+        private float prebufferSeconds
+        {
+            get => Settings.StreamingOpenAiTts.prebufferSeconds;
+            set => Settings.StreamingOpenAiTts.prebufferSeconds = value;
+        }
+
+        private float drainGraceSeconds
+        {
+            get => Settings.StreamingOpenAiTts.drainGraceSeconds;
+            set => Settings.StreamingOpenAiTts.drainGraceSeconds = value;
+        }
+
+        private bool logChunks
+        {
+            get => Settings.StreamingOpenAiTts.logChunks;
+            set => Settings.StreamingOpenAiTts.logChunks = value;
+        }
+
+        private float largeChunkGapWarningSeconds
+        {
+            get => Settings.StreamingOpenAiTts.largeChunkGapWarningSeconds;
+            set => Settings.StreamingOpenAiTts.largeChunkGapWarningSeconds = value;
+        }
+
+        private bool captureFullPcmForDebug
+        {
+            get => Settings.StreamingOpenAiTts.captureFullPcmForDebug;
+            set => Settings.StreamingOpenAiTts.captureFullPcmForDebug = value;
+        }
+
+        private bool logExpectedDuration
+        {
+            get => Settings.StreamingOpenAiTts.logExpectedDuration;
+            set => Settings.StreamingOpenAiTts.logExpectedDuration = value;
+        }
+
+        private bool buildDebugClipOnComplete
+        {
+            get => Settings.StreamingOpenAiTts.buildDebugClipOnComplete;
+            set => Settings.StreamingOpenAiTts.buildDebugClipOnComplete = value;
+        }
 
         // Public runtime accessors for UI
         public float FirstChunkTimeoutSeconds { get => firstChunkTimeoutSeconds; set => firstChunkTimeoutSeconds = Mathf.Max(0.1f, value); }
@@ -147,13 +168,20 @@ namespace MVP.Conversation
         {
             if (string.IsNullOrWhiteSpace(text))
             {
-                onError?.Invoke("StreamingOpenAITTSClient: text vacío.");
+                onError?.Invoke("StreamingOpenAITTSClient: empty text.");
                 yield break;
             }
 
             if (targetPlayer == null)
             {
                 onError?.Invoke("StreamingOpenAITTSClient: targetPlayer nulo.");
+                yield break;
+            }
+
+            string resolvedApiKey = GetApiKey();
+            if (string.IsNullOrWhiteSpace(resolvedApiKey))
+            {
+                onError?.Invoke($"StreamingOpenAITTSClient: API key no configurada. Define {ApiKeyEnvironmentVariable}.");
                 yield break;
             }
 
@@ -207,7 +235,7 @@ namespace MVP.Conversation
                 request.timeout = Mathf.Max(5, requestTimeoutSeconds);
                 request.disposeDownloadHandlerOnDispose = true;
                 request.SetRequestHeader("Content-Type", "application/json");
-                request.SetRequestHeader("Authorization", $"Bearer {apiKey}");
+                request.SetRequestHeader("Authorization", $"Bearer {resolvedApiKey}");
 
                     var operation = request.SendWebRequest();
                 bool requestAbortedByTimeout = false;
@@ -227,8 +255,8 @@ namespace MVP.Conversation
                         requestAbortedByTimeout = true;
                         streamFailed = true;
                         streamErrorMessage = firstChunkTimedOut
-                            ? $"StreamingOpenAITTSClient: timeout esperando el primer chunk PCM ({firstChunkTimeoutSeconds:0.0}s)."
-                            : $"StreamingOpenAITTSClient: timeout por silencio PCM ({chunkSilenceTimeoutSeconds:0.0}s) tras el último chunk.";
+                            ? $"StreamingOpenAITTSClient: timeout waiting for the first PCM chunk ({firstChunkTimeoutSeconds:0.0}s)."
+                            : $"StreamingOpenAITTSClient: PCM silence timeout ({chunkSilenceTimeoutSeconds:0.0}s) after the last chunk.";
 
                         try { request.Abort(); } catch (Exception) { }
 
@@ -300,16 +328,24 @@ namespace MVP.Conversation
             Action<string> onError,
             Action onCompleted)
         {
+            string resolvedApiKey = GetApiKey();
+
             if (string.IsNullOrWhiteSpace(text))
             {
-                onError?.Invoke("StreamingOpenAITTSClient: text vacío.");
+                onError?.Invoke("StreamingOpenAITTSClient: empty text.");
                 activeTurnId = -1;
                 yield break;
             }
 
             if (targetAudioSource == null)
             {
-                onError?.Invoke("StreamingOpenAITTSClient: targetAudioSource nulo.");
+                onError?.Invoke("StreamingOpenAITTSClient: targetAudioSource is null.");
+                yield break;
+            }
+
+            if (string.IsNullOrWhiteSpace(resolvedApiKey))
+            {
+                onError?.Invoke($"StreamingOpenAITTSClient: API key not configured. Set {ApiKeyEnvironmentVariable}.");
                 yield break;
             }
 
@@ -375,7 +411,7 @@ namespace MVP.Conversation
             request.downloadHandler = downloadHandler;
             request.disposeDownloadHandlerOnDispose = true;
             request.SetRequestHeader("Content-Type", "application/json");
-            request.SetRequestHeader("Authorization", $"Bearer {apiKey}");
+            request.SetRequestHeader("Authorization", $"Bearer {resolvedApiKey}");
 
             var operation = request.SendWebRequest();
 
@@ -418,7 +454,9 @@ namespace MVP.Conversation
             if (request.result != UnityWebRequest.Result.Success)
             {
                 streamFailed = true;
-                streamErrorMessage = request.error;
+                streamErrorMessage = request.responseCode == 402
+                    ? "StreamingOpenAITTSClient: HTTP 402 Payment Required. Check your OpenAI plan or payment method."
+                    : request.error;
 
                 if (!string.IsNullOrWhiteSpace(request.downloadHandler?.text))
                     streamErrorMessage += "\n" + request.downloadHandler.text;
@@ -427,7 +465,7 @@ namespace MVP.Conversation
             if (streamFailed)
             {
                 targetAudioSource.Stop();
-                onError?.Invoke(streamErrorMessage ?? "StreamingOpenAITTSClient: fallo en la petición TTS.");
+                onError?.Invoke(streamErrorMessage ?? "StreamingOpenAITTSClient: TTS request failed.");
                 yield break;
             }
 
@@ -443,7 +481,7 @@ namespace MVP.Conversation
                 if (streamFailed)
                 {
                     targetAudioSource.Stop();
-                    onError?.Invoke(streamErrorMessage ?? "StreamingOpenAITTSClient: fallo durante reproducción.");
+                    onError?.Invoke(streamErrorMessage ?? "StreamingOpenAITTSClient: playback failed.");
                     yield break;
                 }
 
@@ -680,7 +718,7 @@ namespace MVP.Conversation
 
             if (hasPendingOddByte)
             {
-                Debug.LogWarning("[StreamingOpenAITTSClient] Quedó 1 byte PCM suelto al final del stream. Se descartará para el clip debug.");
+                Debug.LogWarning("[StreamingOpenAITTSClient] One stray PCM byte remained at the end of the stream. It will be discarded for the debug clip.");
             }
 
             int usableBytes = fullPcmCapture.Count - (fullPcmCapture.Count % 2);
@@ -866,6 +904,11 @@ namespace MVP.Conversation
             {
                 owner.NotifyComplete();
             }
+        }
+
+        private string GetApiKey()
+        {
+            return ApiKeyProvider.Resolve(apiKey, ApiKeyEnvironmentVariable, nameof(StreamingOpenAITTSClient));
         }
     }
 }

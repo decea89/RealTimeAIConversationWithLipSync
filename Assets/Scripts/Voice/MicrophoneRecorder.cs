@@ -7,30 +7,30 @@ namespace MVP.Conversation
     {
         [Header("Microphone")]
         [SerializeField]
-        [Tooltip("Micrófono seleccionado. Si vacío, usa el default.")]
+        [Tooltip("Selected microphone. If empty, uses the default device.")]
         private string selectedDevice;
         
         [SerializeField]
         [Range(16000, 48000)]
-        [Tooltip("Frecuencia de grabación. Más alto=mejor calidad pero más datos. 48000=CD quality.")]
+        [Tooltip("Recording frequency. Higher values mean better quality but more data. 48000 is CD quality.")]
         private int sampleRate = 48000;
         
         [SerializeField]
         [Range(5, 60)]
-        [Tooltip("Duración máxima de grabación (s). Útil para evitar grabar todo accidentalmente.")]
+        [Tooltip("Maximum recording duration in seconds. Useful to avoid recording indefinitely by accident.")]
         private int maxLengthSeconds = 10;
         
         [SerializeField]
-        [Tooltip("Loop recording. Usualmente OFF para PTT.")]
+        [Tooltip("Loop recording. Usually OFF for push-to-talk.")]
         private bool loopRecording = false;
         
         [SerializeField]
-        [Tooltip("Mostrar logs de grabación en consola. Útil para debugging.")]
+        [Tooltip("Show recording logs in the console. Useful for debugging.")]
         private bool logDiagnostics = true;
         
         [SerializeField]
         [Range(0.01f, 1.0f)]
-        [Tooltip("Duración mínima para considerar grabación válida (s). Evita acciones accidentales.")]
+        [Tooltip("Minimum duration required to consider a recording valid. Helps avoid accidental triggers.")]
         private float minRecordedSeconds = 0.08f;
 
         public bool IsRecording { get; private set; }
@@ -44,7 +44,7 @@ namespace MVP.Conversation
 
             if (Microphone.devices == null || Microphone.devices.Length == 0)
             {
-                Debug.LogError("[MicrophoneRecorder] No hay micrófonos disponibles en el dispositivo.");
+                Debug.LogError("[MicrophoneRecorder] No microphones are available on the device.");
                 return false;
             }
 
@@ -64,9 +64,9 @@ namespace MVP.Conversation
 
             if (logDiagnostics)
             {
-                Debug.Log("[MicrophoneRecorder] Dispositivos detectados: " + string.Join(", ", Microphone.devices));
+                Debug.Log("[MicrophoneRecorder] Detected devices: " + string.Join(", ", Microphone.devices));
                 Debug.Log($"[MicrophoneRecorder] Device caps min={minFreq} max={maxFreq}. Requested={sampleRate}, final={requestedFrequency}");
-                Debug.Log("[MicrophoneRecorder] Usando dispositivo: '" + selectedDevice + "'");
+                Debug.Log("[MicrophoneRecorder] Using device: '" + selectedDevice + "'");
             }
 
             CurrentClip = Microphone.Start(selectedDevice, loopRecording, maxLengthSeconds, requestedFrequency);
@@ -96,7 +96,7 @@ namespace MVP.Conversation
             {
                 Microphone.End(selectedDevice);
                 IsRecording = false;
-                Debug.LogError("[MicrophoneRecorder] CurrentClip es null al detener grabación.");
+                Debug.LogError("[MicrophoneRecorder] CurrentClip is null while stopping recording.");
                 return null;
             }
 
@@ -115,7 +115,7 @@ namespace MVP.Conversation
             if (safePosition < minSamplesNeeded)
             {
                 if (logDiagnostics)
-                    Debug.LogWarning($"[MicrophoneRecorder] Posición baja del micrófono. safePosition={safePosition}, minSamplesNeeded={minSamplesNeeded}. Se usará el clip completo como fallback.");
+                    Debug.LogWarning($"[MicrophoneRecorder] Low microphone position. safePosition={safePosition}, minSamplesNeeded={minSamplesNeeded}. The full clip will be used as a fallback.");
 
                 safePosition = clipSamples;
             }
@@ -127,7 +127,7 @@ namespace MVP.Conversation
             int trimmedSampleCount = safePosition * channels;
             if (trimmedSampleCount <= 0 || trimmedSampleCount > fullData.Length)
             {
-                Debug.LogError($"[MicrophoneRecorder] trimmedSampleCount inválido. trimmed={trimmedSampleCount}, full={fullData.Length}");
+                Debug.LogError($"[MicrophoneRecorder] Invalid trimmedSampleCount. trimmed={trimmedSampleCount}, full={fullData.Length}");
                 return null;
             }
 
@@ -145,7 +145,7 @@ namespace MVP.Conversation
 
             if (logDiagnostics)
             {
-                Debug.Log("[MicrophoneRecorder] Trimmed clip creado correctamente. samples=" + trimmedClip.samples +
+                Debug.Log("[MicrophoneRecorder] Trimmed clip created successfully. samples=" + trimmedClip.samples +
                           " channels=" + trimmedClip.channels +
                           " frequency=" + trimmedClip.frequency +
                           " length=" + trimmedClip.length);

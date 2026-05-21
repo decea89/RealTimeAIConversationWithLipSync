@@ -25,53 +25,59 @@ namespace MVP.Conversation
 
     public class RealtimeOpenAITTSClient : MonoBehaviour, IRealtimeTTSService
     {
-        [Header("Dependencies")]
         [SerializeField]
-        [Tooltip("Componente BufferedOpenAITTSClient o similar para pseudo-streaming (fallback si no hay streaming).")]
+            [Tooltip("ITTSService or IStreamingTTSService component for speech synthesis (fallback when streaming is unavailable).")]
         private MonoBehaviour innerTtsServiceBehaviour; // ITTSService
         
         [SerializeField]
-        [Tooltip("Componente RealtimeAudioPlayer. Maneja playback de streaming de audio.")]
+        [Tooltip("RealtimeAudioPlayer component. Handles streamed audio playback.")]
         private RealtimeAudioPlayer realtimeAudioPlayer;
         
         [SerializeField]
-        [Tooltip("Componente OVRLipSyncChunkBridge. Enqueue clips para lip sync en tiempo real. Opcional.")]
+        [Tooltip("OVRLipSyncChunkBridge component. Enqueues clips for real-time lip sync. Optional.")]
         private OVRLipSyncChunkBridge lipSyncBridge;
         
         [SerializeField]
-        [Tooltip("(Obsoleto) AudioSource antiguo. No se usa en la ruta de streaming actual.")]
+        [Tooltip("(Deprecated) Legacy AudioSource. Not used in the current streaming path.")]
         private AudioSource streamingAudioSource;
 
-        [Header("Pseudo-streaming")]
-        [SerializeField]
-        [Range(10, 100)]
-        [Tooltip("Caracteres por chunk TTS. Bajo (10-20)=latencia alta. Alto (50-100)=menos chunks. Recomendado: 30-40.")]
-        private int maxChunkChars = 30;
-        
-        [SerializeField]
-        [Range(0f, 1.0f)]
-        [Tooltip("Espera entre chunks (s). 0=sin espera. 0.1-0.3=pausa natural entre frases.")]
-        private float interChunkGapSeconds = 0.0f;
-        
-        [SerializeField]
-        [Tooltip("Mostrar logs detallados (inicio, cancela, etc).")]
-        private bool verboseLogging = true;
-        
-        [Header("Telemetry")]
-        [SerializeField]
-        [Tooltip("Mostrar métricas: tiempo a primer audio, duración reproducción.")]
-        private bool enableTelemetry = true;
-        
-        [SerializeField]
-        [Range(0.5f, 30f)]
-        [Tooltip("Tiempo máximo esperando a que entren más samples (s). Sube esto si en respuestas largas el audio se queda parado o tarda en reanudar; bájalo si prefieres abortar antes cuando la cola se atasca.")]
-        private float enqueueStallTimeoutSeconds = 8f;
-        
-        [Header("Smoothing")]
-        [SerializeField]
-        [Range(0f, 200f)]
-        [Tooltip("Transición entre chunks (ms). 0=sin suavizado. 20-50=recomendado.")]
-        private float chunkCrossfadeMs = 35f;
+        private static ConversationSettings Settings => ConversationSettings.Instance;
+
+        private int maxChunkChars
+        {
+            get => Settings.RealtimeOpenAiTts.maxChunkChars;
+            set => Settings.RealtimeOpenAiTts.maxChunkChars = value;
+        }
+
+        private float interChunkGapSeconds
+        {
+            get => Settings.RealtimeOpenAiTts.interChunkGapSeconds;
+            set => Settings.RealtimeOpenAiTts.interChunkGapSeconds = value;
+        }
+
+        private bool verboseLogging
+        {
+            get => Settings.RealtimeOpenAiTts.verboseLogging;
+            set => Settings.RealtimeOpenAiTts.verboseLogging = value;
+        }
+
+        private bool enableTelemetry
+        {
+            get => Settings.RealtimeOpenAiTts.enableTelemetry;
+            set => Settings.RealtimeOpenAiTts.enableTelemetry = value;
+        }
+
+        private float enqueueStallTimeoutSeconds
+        {
+            get => Settings.RealtimeOpenAiTts.enqueueStallTimeoutSeconds;
+            set => Settings.RealtimeOpenAiTts.enqueueStallTimeoutSeconds = value;
+        }
+
+        private float chunkCrossfadeMs
+        {
+            get => Settings.RealtimeOpenAiTts.chunkCrossfadeMs;
+            set => Settings.RealtimeOpenAiTts.chunkCrossfadeMs = value;
+        }
 
         // Public runtime accessors
         public bool VerboseLogging { get => verboseLogging; set => verboseLogging = value; }
@@ -114,7 +120,7 @@ namespace MVP.Conversation
             }
 
             if (realtimeAudioPlayer == null)
-                Debug.LogError("[RealtimeOpenAITTSClient] realtimeAudioPlayer no está asignado.");
+                Debug.LogError("[RealtimeOpenAITTSClient] realtimeAudioPlayer is not assigned.");
 
             if (streamingAudioSource == null)
             {
@@ -136,7 +142,7 @@ namespace MVP.Conversation
         {
             if (string.IsNullOrWhiteSpace(text))
             {
-                onError?.Invoke("RealtimeOpenAITTSClient: text vacío.");
+                onError?.Invoke("RealtimeOpenAITTSClient: empty text.");
                 return null;
             }
 
@@ -156,7 +162,7 @@ namespace MVP.Conversation
 
             if (realtimeAudioPlayer == null)
             {
-                onError?.Invoke("RealtimeOpenAITTSClient: realtimeAudioPlayer no está asignado.");
+                onError?.Invoke("RealtimeOpenAITTSClient: realtimeAudioPlayer is not assigned.");
                 return null;
             }
 
@@ -470,8 +476,8 @@ namespace MVP.Conversation
         currentError = nextError;
     }
 
-    // Avisamos al player de que no vendrán más muestras,
-    // pero NO esperamos a que drene el buffer aquí.
+    // Notify the player that no more samples will arrive,
+    // but do NOT wait for the buffer to drain here.
     realtimeAudioPlayer.MarkProducerCompleted(handle.GenerationId);
 
     if (verboseLogging)
@@ -491,7 +497,7 @@ namespace MVP.Conversation
     RemoveHandle(handle);
 }
 
-// Pequeño helper para usar RequestSpeech como coroutine
+// Small helper to use RequestSpeech as a coroutine
 private IEnumerator RequestSpeechCoroutine(
     string text,
     Action<AudioClip> onClip,

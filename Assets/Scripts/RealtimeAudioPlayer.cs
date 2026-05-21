@@ -5,35 +5,41 @@ namespace MVP.Conversation
 {
     public class RealtimeAudioPlayer : MonoBehaviour
     {
-        [Header("Buffer")]
-        [SerializeField]
-        [Range(48000, 768000)]
-        [Tooltip("Capacidad total del buffer (samples). Más alto=más memoria pero más seguro para audio largo. Típico: 768000 (~16s a 48kHz).")]
-        private int bufferCapacitySamples = 48000 * 16; // ~16s mono a 48kHz
-        
-        [SerializeField]
-        [Range(512, 16384)]
-        [Tooltip("Buffer mínimo antes de reproducir (samples). Más alto=más seguro pero latencia inicial. 2048=~42ms delay.")]
-        private int prebufferSamples = 2048;
-        
-        [SerializeField]
-        [Range(0, 16384)]
-        [Tooltip("Muestras extra de margen de seguridad antes de considerar que el audio ha comenzado. Sube este valor si oyes un corte breve al inicio.")]
-        private int startSafetySamples = 4096;
+        private static ConversationSettings Settings => ConversationSettings.Instance;
+
+        private int bufferCapacitySamples
+        {
+            get => Settings.RealtimeAudioPlayer.bufferCapacitySamples;
+            set => Settings.RealtimeAudioPlayer.bufferCapacitySamples = Mathf.Clamp(value, 48000, 768000);
+        }
+
+        private int prebufferSamples
+        {
+            get => Settings.RealtimeAudioPlayer.prebufferSamples;
+            set => Settings.RealtimeAudioPlayer.prebufferSamples = Mathf.Clamp(value, 256, 16384);
+        }
+
+        private int startSafetySamples
+        {
+            get => Settings.RealtimeAudioPlayer.startSafetySamples;
+            set => Settings.RealtimeAudioPlayer.startSafetySamples = Mathf.Max(0, value);
+        }
 
         private bool enableAdaptiveStart = true;
 
         private int adaptiveStartMinSamples = 2048;
 
-        [SerializeField]
-        [Range(20, 500)]
-        [Tooltip("Espera maxima (ms) tras el primer write antes de arrancar con inicio adaptativo.")]
-        private int adaptiveStartMaxWaitMs = 120;
-        
-        [SerializeField]
-        [Range(256, 4096)]
-        [Tooltip("Muestras que deben quedar como máximo para dar por terminado el audio. Más alto=cierra antes; más bajo=espera más a que drene.")]
-        private int drainGraceSamples = 256;
+        private int adaptiveStartMaxWaitMs
+        {
+            get => Settings.RealtimeAudioPlayer.adaptiveStartMaxWaitMs;
+            set => Settings.RealtimeAudioPlayer.adaptiveStartMaxWaitMs = Mathf.Clamp(value, 20, 10000);
+        }
+
+        private int drainGraceSamples
+        {
+            get => Settings.RealtimeAudioPlayer.drainGraceSamples;
+            set => Settings.RealtimeAudioPlayer.drainGraceSamples = Mathf.Clamp(value, 0, 16384);
+        }
 
         [Header("Audio Source")]
         [SerializeField]

@@ -10,25 +10,27 @@ namespace MVP.Conversation
 {
     public class WorldSpaceDebugPanelController : MonoBehaviour
     {
+        private static ConversationSettings Settings => ConversationSettings.Instance;
+
         [Header("Core References")]
         [SerializeField]
-        [Tooltip("Controlador principal de conversación. Requiere para monitorear estado.")]
+        [Tooltip("Main conversation controller. Required to monitor state.")]
         private OpenAIConversationController conversationController;
         
         [SerializeField]
-        [Tooltip("AudioSource del avatar. Para control de volumen.")]
+        [Tooltip("Avatar AudioSource. Used for volume control.")]
         private AudioSource avatarAudioSource;
         
         [SerializeField]
-        [Tooltip("Cliente TTS realtime. Para monitorear tiempos y streaming.")]
+        [Tooltip("Realtime TTS client. Used to monitor timings and streaming.")]
         private RealtimeOpenAITTSClient realtimeTtsClient;
         
         [SerializeField]
-        [Tooltip("Comportamiento de LipSync (OVRLipSyncContext). Opcional para sincronizar movimientos.")]
+        [Tooltip("Lip Sync behaviour (OVRLipSyncContext). Optional for synchronizing mouth movement.")]
         private MonoBehaviour lipSyncBehaviour;
         
         [SerializeField]
-        [Tooltip("Controlador de emociones. Opcional para sincronizar expresiones.")]
+        [Tooltip("Emotion controller. Optional for synchronizing expressions.")]
         private MonoBehaviour emotionBehaviour;
 
         [Header("Text UI")]
@@ -74,10 +76,23 @@ namespace MVP.Conversation
         [SerializeField] private Button applyDefaultButton;
         [SerializeField] private Button flushTelemetryButton;
 
-        [Header("Optional")]
-        [SerializeField] private bool captureUnityLogs = true;
-        [SerializeField] private int maxLogLines = 12;
-        [SerializeField] private bool includeControllerHeartbeat = true;
+        private bool captureUnityLogs
+        {
+            get => Settings.WorldSpaceDebugPanel.captureUnityLogs;
+            set => Settings.WorldSpaceDebugPanel.captureUnityLogs = value;
+        }
+
+        private int maxLogLines
+        {
+            get => Settings.WorldSpaceDebugPanel.maxLogLines;
+            set => Settings.WorldSpaceDebugPanel.maxLogLines = value;
+        }
+
+        private bool includeControllerHeartbeat
+        {
+            get => Settings.WorldSpaceDebugPanel.includeControllerHeartbeat;
+            set => Settings.WorldSpaceDebugPanel.includeControllerHeartbeat = value;
+        }
 
         private readonly StringBuilder runtimeLogs = new StringBuilder();
         private readonly Queue<string> localLogQueue = new Queue<string>();

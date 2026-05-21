@@ -16,133 +16,160 @@ namespace MVP.Conversation
         [InspectorName("MP3 44.1 kHz (192kbps)")]
         Mp3_44100_192,
 
-        [InspectorName("WAV 8 kHz (Sin pérdida)")]
+        [InspectorName("WAV 8 kHz (Lossless)")]
         Wav_8000,
 
-        [InspectorName("WAV 16 kHz (Sin pérdida)")]
+        [InspectorName("WAV 16 kHz")]
         Wav_16000,
 
-        [InspectorName("WAV 22.05 kHz (Sin pérdida)")]
+        [InspectorName("WAV 22.05 kHz")]
         Wav_22050,
 
-        [InspectorName("WAV 24 kHz (Sin pérdida)")]
+        [InspectorName("WAV 24 kHz")]
         Wav_24000,
 
-        [InspectorName("WAV 44.1 kHz (Sin pérdida)")]
+        [InspectorName("WAV 44.1 kHz")]
         Wav_44100,
 
-        [InspectorName("PCM 22.05 kHz (Streaming)")]
+        [InspectorName("PCM 22.05 kHz")]
         Pcm_22050,
 
-        [InspectorName("PCM 44.1 kHz (Streaming)")]
-        Pcm_44100
+        [InspectorName("PCM 44.1 kHz")]
+        Pcm_44100,
     }
 
-    public class StreamingElevenLabsTTSClient : MonoBehaviour, IStreamingTTSService, ITTSService, IInterruptibleTTSService
+    public class StreamingElevenLabsTTSClient : MonoBehaviour, IStreamingTTSService
     {
-        [Header("ElevenLabs")]
-        [SerializeField]
-        [Tooltip("API key de ElevenLabs. Mantener privada.")]
-        private string apiKey = "YOUR_ELEVENLABS_API_KEY";
+        private const string ApiKeyEnvironmentVariable = "ELEVENLABS_API_KEY";
+        private string apiKey = string.Empty;
 
-        [SerializeField]
-        [Tooltip("Voice ID de ElevenLabs. Se obtiene desde la plataforma / voices.")]
-        private string voiceId = "YOUR_VOICE_ID";
+        private static ConversationSettings Settings => ConversationSettings.Instance;
 
-        [SerializeField]
-        [Tooltip("Modelo ElevenLabs a usar. Por ejemplo: eleven_multilingual_v2, eleven_flash_v2_5.")]
-        private string modelId = "eleven_multilingual_v2";
+        private string voiceId
+        {
+            get => Settings.StreamingElevenLabsTts.voiceId;
+            set => Settings.StreamingElevenLabsTts.voiceId = value;
+        }
 
-        [SerializeField]
-        [Tooltip("Código de idioma opcional. Ejemplo: es, en, fr. Dejar vacío para no forzar idioma.")]
-        private string languageCode = string.Empty;
+        private string modelId
+        {
+            get => Settings.StreamingElevenLabsTts.modelId;
+            set => Settings.StreamingElevenLabsTts.modelId = value;
+        }
 
-        [SerializeField]
-        [Tooltip("Mostrar logs de diagnóstico de ElevenLabs.")]
-        private bool verboseLogging = true;
+        private string languageCode
+        {
+            get => Settings.StreamingElevenLabsTts.languageCode;
+            set => Settings.StreamingElevenLabsTts.languageCode = value;
+        }
 
-        [SerializeField]
-        [Range(-1, 4)]
-        [Tooltip("Optimización de latencia del streaming. -1 omite el parámetro. 0-4 sigue la API de ElevenLabs.")]
-        private int optimizeStreamingLatency = -1;
+        private bool verboseLogging
+        {
+            get => Settings.StreamingElevenLabsTts.verboseLogging;
+            set => Settings.StreamingElevenLabsTts.verboseLogging = value;
+        }
 
-        [Header("Voice Settings")]
-        [SerializeField]
-        [Range(0.5f, 1.5f)]
-        [Tooltip("Velocidad de la voz. 1.0 es la velocidad normal.")]
-        private float speed = 1.0f;
+        private int optimizeStreamingLatency
+        {
+            get => Settings.StreamingElevenLabsTts.optimizeStreamingLatency;
+            set => Settings.StreamingElevenLabsTts.optimizeStreamingLatency = value;
+        }
 
-        [SerializeField]
-        [Range(0f, 1f)]
-        [Tooltip("Estabilidad. Más alto = más consistente, más bajo = más expresivo.")]
-        private float stability = 0.5f;
+        private float speed
+        {
+            get => Settings.StreamingElevenLabsTts.speed;
+            set => Settings.StreamingElevenLabsTts.speed = value;
+        }
 
-        [SerializeField]
-        [Range(0f, 1f)]
-        [Tooltip("Similitud con la voz original. Más alto = más parecido al voice profile.")]
-        private float similarityBoost = 0.8f;
+        private float stability
+        {
+            get => Settings.StreamingElevenLabsTts.stability;
+            set => Settings.StreamingElevenLabsTts.stability = value;
+        }
 
-        [SerializeField]
-        [Range(0f, 1f)]
-        [Tooltip("Exageración de estilo. Más alto = más marcada la interpretación.")]
-        private float style = 0f;
+        private float similarityBoost
+        {
+            get => Settings.StreamingElevenLabsTts.similarityBoost;
+            set => Settings.StreamingElevenLabsTts.similarityBoost = value;
+        }
 
-        [SerializeField]
-        [Tooltip("Refuerzo adicional de speaker. Útil para voces que lo soporten.")]
-        private bool useSpeakerBoost = true;
+        private float style
+        {
+            get => Settings.StreamingElevenLabsTts.style;
+            set => Settings.StreamingElevenLabsTts.style = value;
+        }
 
-        [Header("Output")]
-        [SerializeField]
-        [Tooltip("Formato de salida ElevenLabs. PCM mantiene el flujo más cercano al streaming.")]
-        private ElevenLabsOutputFormat outputFormat = ElevenLabsOutputFormat.Pcm_22050;
+        private bool useSpeakerBoost
+        {
+            get => Settings.StreamingElevenLabsTts.useSpeakerBoost;
+            set => Settings.StreamingElevenLabsTts.useSpeakerBoost = value;
+        }
 
-        [SerializeField]
-        [Range(5, 180)]
-        [Tooltip("Timeout de la petición TTS (s).")]
-        private int requestTimeoutSeconds = 90;
+        private ElevenLabsOutputFormat outputFormat
+        {
+            get => Settings.StreamingElevenLabsTts.outputFormat;
+            set => Settings.StreamingElevenLabsTts.outputFormat = value;
+        }
 
-        [SerializeField]
-        [Range(1f, 15f)]
-        [Tooltip("Tiempo máximo esperando el primer chunk PCM antes de abortar el stream.")]
-        private float firstChunkTimeoutSeconds = 4f;
+        private int requestTimeoutSeconds
+        {
+            get => Settings.StreamingElevenLabsTts.requestTimeoutSeconds;
+            set => Settings.StreamingElevenLabsTts.requestTimeoutSeconds = value;
+        }
 
-        [SerializeField]
-        [Range(1f, 15f)]
-        [Tooltip("Tiempo máximo sin recibir PCM una vez que el stream ya empezó.")]
-        private float chunkSilenceTimeoutSeconds = 2.5f;
+        private float firstChunkTimeoutSeconds
+        {
+            get => Settings.StreamingElevenLabsTts.firstChunkTimeoutSeconds;
+            set => Settings.StreamingElevenLabsTts.firstChunkTimeoutSeconds = value;
+        }
 
-        [SerializeField]
-        [Range(0.05f, 2.0f)]
-        [Tooltip("Buffer inicial en segundos antes de reproducir.")]
-        private float prebufferSeconds = 0.35f;
+        private float chunkSilenceTimeoutSeconds
+        {
+            get => Settings.StreamingElevenLabsTts.chunkSilenceTimeoutSeconds;
+            set => Settings.StreamingElevenLabsTts.chunkSilenceTimeoutSeconds = value;
+        }
 
-        [SerializeField]
-        [Range(0.5f, 10.0f)]
-        [Tooltip("Tiempo extra para drenar el buffer al final.")]
-        private float drainGraceSeconds = 2.0f;
+        private float prebufferSeconds
+        {
+            get => Settings.StreamingElevenLabsTts.prebufferSeconds;
+            set => Settings.StreamingElevenLabsTts.prebufferSeconds = value;
+        }
 
-        [Header("PCM / Debug")]
-        [SerializeField]
-        [Tooltip("Capturar PCM para debug y auditoría de calidad.")]
-        private bool captureFullPcmForDebug = false;
+        private float drainGraceSeconds
+        {
+            get => Settings.StreamingElevenLabsTts.drainGraceSeconds;
+            set => Settings.StreamingElevenLabsTts.drainGraceSeconds = value;
+        }
 
-        [SerializeField]
-        [Tooltip("Mostrar duración esperada del audio en logs.")]
-        private bool logExpectedDuration = false;
+        private float largeChunkGapWarningSeconds
+        {
+            get => Settings.StreamingElevenLabsTts.largeChunkGapWarningSeconds;
+            set => Settings.StreamingElevenLabsTts.largeChunkGapWarningSeconds = value;
+        }
 
-        [SerializeField]
-        [Tooltip("Crear AudioClip debug al terminar. Útil para revisar la salida.")]
-        private bool buildDebugClipOnComplete = false;
+        private bool captureFullPcmForDebug
+        {
+            get => Settings.StreamingElevenLabsTts.captureFullPcmForDebug;
+            set => Settings.StreamingElevenLabsTts.captureFullPcmForDebug = value;
+        }
 
-        [SerializeField]
-        [Range(0.08f, 1.0f)]
-        [Tooltip("Gap mínimo entre chunks para mostrar warning.")]
-        private float largeChunkGapWarningSeconds = 0.25f;
+        private bool logExpectedDuration
+        {
+            get => Settings.StreamingElevenLabsTts.logExpectedDuration;
+            set => Settings.StreamingElevenLabsTts.logExpectedDuration = value;
+        }
 
-        [SerializeField]
-        [Range(10, 120)]
-        [Tooltip("Duración máxima del buffer PCM (s). Más alto = más seguro para textos largos.")]
-        private int maxClipSeconds = 60;
+        private bool buildDebugClipOnComplete
+        {
+            get => Settings.StreamingElevenLabsTts.buildDebugClipOnComplete;
+            set => Settings.StreamingElevenLabsTts.buildDebugClipOnComplete = value;
+        }
+
+        private int maxClipSeconds
+        {
+            get => Settings.StreamingElevenLabsTts.maxClipSeconds;
+            set => Settings.StreamingElevenLabsTts.maxClipSeconds = value;
+        }
 
         [Header("Optional Continuity")]
         [SerializeField]
@@ -199,11 +226,11 @@ namespace MVP.Conversation
 
         private void Awake()
         {
-            if (string.IsNullOrWhiteSpace(apiKey))
-                Debug.LogWarning("[StreamingElevenLabsTTSClient] API key vacía.");
+            if (string.IsNullOrWhiteSpace(GetApiKey()))
+                Debug.LogWarning($"[StreamingElevenLabsTTSClient] API key is empty. Set {ApiKeyEnvironmentVariable} in your local environment.");
 
             if (string.IsNullOrWhiteSpace(voiceId))
-                Debug.LogWarning("[StreamingElevenLabsTTSClient] Voice ID vacío.");
+                Debug.LogWarning("[StreamingElevenLabsTTSClient] Voice ID is empty.");
         }
 
         public void InterruptPlayback()
@@ -227,13 +254,20 @@ namespace MVP.Conversation
         {
             if (string.IsNullOrWhiteSpace(text))
             {
-                onError?.Invoke("StreamingElevenLabsTTSClient: text vacío.");
+                onError?.Invoke("StreamingElevenLabsTTSClient: empty text.");
                 yield break;
             }
 
             if (targetAudioSource == null)
             {
-                onError?.Invoke("StreamingElevenLabsTTSClient: targetAudioSource nulo.");
+                onError?.Invoke("StreamingElevenLabsTTSClient: targetAudioSource is null.");
+                yield break;
+            }
+
+            string resolvedApiKey = GetApiKey();
+            if (string.IsNullOrWhiteSpace(resolvedApiKey))
+            {
+                onError?.Invoke($"StreamingElevenLabsTTSClient: API key not configured. Set {ApiKeyEnvironmentVariable}.");
                 yield break;
             }
 
@@ -256,13 +290,13 @@ namespace MVP.Conversation
         {
             if (string.IsNullOrWhiteSpace(text))
             {
-                onComplete?.Invoke(null, "StreamingElevenLabsTTSClient: text vacío.");
+                onComplete?.Invoke(null, "StreamingElevenLabsTTSClient: empty text.");
                 yield break;
             }
 
             if (IsPcmFormat(outputFormat))
             {
-                onComplete?.Invoke(null, "StreamingElevenLabsTTSClient: RequestSpeech devuelve AudioClip solo para formatos no-PCM. Usa RequestSpeechStreamed para PCM.");
+                onComplete?.Invoke(null, "StreamingElevenLabsTTSClient: RequestSpeech returns an AudioClip only for non-PCM formats. Use RequestSpeechStreamed for PCM.");
                 yield break;
             }
 
@@ -290,7 +324,7 @@ namespace MVP.Conversation
 
             if (!finished)
             {
-                onComplete?.Invoke(null, "StreamingElevenLabsTTSClient: no se pudo completar la petición.");
+                onComplete?.Invoke(null, "StreamingElevenLabsTTSClient: the request could not be completed.");
                 yield break;
             }
 
@@ -305,6 +339,14 @@ namespace MVP.Conversation
             Action<string> onError,
             Action onCompleted)
         {
+            string resolvedApiKey = GetApiKey();
+
+            if (string.IsNullOrWhiteSpace(resolvedApiKey))
+            {
+                onError?.Invoke($"StreamingElevenLabsTTSClient: API key not configured. Set {ApiKeyEnvironmentVariable}.");
+                yield break;
+            }
+
             int sampleRate = GetPcmSampleRate(outputFormat);
             int channels = 1;
             int capacitySamples = sampleRate * Mathf.Max(1, maxClipSeconds);
@@ -333,7 +375,7 @@ namespace MVP.Conversation
                 unityRequest.timeout = Mathf.Max(5, requestTimeoutSeconds);
                 unityRequest.disposeDownloadHandlerOnDispose = true;
                 unityRequest.SetRequestHeader("Content-Type", "application/json");
-                unityRequest.SetRequestHeader("xi-api-key", apiKey);
+                unityRequest.SetRequestHeader("xi-api-key", resolvedApiKey);
 
                 if (verboseLogging)
                 {
@@ -379,8 +421,8 @@ namespace MVP.Conversation
                         requestAbortedByTimeout = true;
                         streamFailed = true;
                         streamErrorMessage = firstChunkTimedOut
-                            ? $"StreamingElevenLabsTTSClient: timeout esperando el primer chunk PCM ({firstChunkTimeoutSeconds:0.0}s)."
-                            : $"StreamingElevenLabsTTSClient: timeout por silencio PCM ({chunkSilenceTimeoutSeconds:0.0}s) tras el último chunk.";
+                            ? $"StreamingElevenLabsTTSClient: timeout waiting for the first PCM chunk ({firstChunkTimeoutSeconds:0.0}s)."
+                            : $"StreamingElevenLabsTTSClient: PCM silence timeout ({chunkSilenceTimeoutSeconds:0.0}s) after the last chunk.";
 
                         try { unityRequest.Abort(); } catch (Exception) { }
 
@@ -420,7 +462,9 @@ namespace MVP.Conversation
                 if (unityRequest.result != UnityWebRequest.Result.Success && !requestAbortedByTimeout)
                 {
                     streamFailed = true;
-                    streamErrorMessage = string.IsNullOrWhiteSpace(unityRequest.error) ? "StreamingElevenLabsTTSClient: fallo en la petición TTS." : unityRequest.error;
+                    streamErrorMessage = unityRequest.responseCode == 402
+                        ? "StreamingElevenLabsTTSClient: HTTP 402 Payment Required. Check your plan, payment method, and ElevenLabs quota."
+                        : (string.IsNullOrWhiteSpace(unityRequest.error) ? "StreamingElevenLabsTTSClient: TTS request failed." : unityRequest.error);
                     onError?.Invoke(streamErrorMessage);
                     yield break;
                 }
@@ -463,6 +507,14 @@ namespace MVP.Conversation
             Action onCompleted,
             Action<AudioClip> onClipReady = null)
         {
+            string resolvedApiKey = GetApiKey();
+
+            if (string.IsNullOrWhiteSpace(resolvedApiKey))
+            {
+                onError?.Invoke($"StreamingElevenLabsTTSClient: API key no configurada. Define {ApiKeyEnvironmentVariable}.");
+                yield break;
+            }
+
             string requestJson = BuildRequest(text);
             string url = BuildRequestUrl();
             byte[] bodyRaw = Encoding.UTF8.GetBytes(requestJson);
@@ -479,7 +531,7 @@ namespace MVP.Conversation
                 unityRequest.timeout = Mathf.Max(5, requestTimeoutSeconds);
                 unityRequest.disposeDownloadHandlerOnDispose = true;
                 unityRequest.SetRequestHeader("Content-Type", "application/json");
-                unityRequest.SetRequestHeader("xi-api-key", apiKey);
+                unityRequest.SetRequestHeader("xi-api-key", resolvedApiKey);
 
                 if (verboseLogging)
                 {
@@ -502,7 +554,9 @@ namespace MVP.Conversation
                 if (unityRequest.result != UnityWebRequest.Result.Success)
                 {
                     streamFailed = true;
-                    streamErrorMessage = string.IsNullOrWhiteSpace(unityRequest.error) ? "StreamingElevenLabsTTSClient: fallo en la petición TTS." : unityRequest.error;
+                    streamErrorMessage = unityRequest.responseCode == 402
+                        ? "StreamingElevenLabsTTSClient: HTTP 402 Payment Required. Check your plan, payment method, and ElevenLabs quota."
+                        : (string.IsNullOrWhiteSpace(unityRequest.error) ? "StreamingElevenLabsTTSClient: TTS request failed." : unityRequest.error);
                     onError?.Invoke(streamErrorMessage);
                     yield break;
                 }
@@ -510,7 +564,7 @@ namespace MVP.Conversation
                 AudioClip clip = DownloadHandlerAudioClip.GetContent(unityRequest);
                 if (clip == null)
                 {
-                    onError?.Invoke("StreamingElevenLabsTTSClient: la respuesta no devolvió un AudioClip válido.");
+                    onError?.Invoke("StreamingElevenLabsTTSClient: the response did not return a valid AudioClip.");
                     yield break;
                 }
 
@@ -910,6 +964,11 @@ namespace MVP.Conversation
             {
                 owner.streamCompleted = true;
             }
+        }
+
+        private string GetApiKey()
+        {
+            return ApiKeyProvider.Resolve(apiKey, ApiKeyEnvironmentVariable, nameof(StreamingElevenLabsTTSClient));
         }
 
     }
