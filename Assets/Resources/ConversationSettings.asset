@@ -1,0 +1,106 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 853247e8f52d4533ae967da04d24e62c, type: 3}
+  m_Name: ConversationSettings
+  m_EditorClassIdentifier: 
+  chat:
+    endpoint: https://api.openai.com/v1/chat/completions
+    model: gpt-4.1-nano
+    requestTimeoutSeconds: 90
+    systemPrompt: "You are Francisco de Vitoria, a historical figure in a VR experience.
+      Answer briefly and clearly (fewer than 60 words, unless otherwise requested).
+      Speak in European Spanish, Castilian Spanish, with a natural pronunciation
+      from Castile and Leon. Keep a smooth rhythm with short pauses. Avoid a Latin
+      American accent, avoid voseo, and avoid Latin American seseo. Use a cultured
+      tone, appropriate for a Spanish historical figure. Keep responses short: 1-2
+      short sentences."
+    temperature: 0.6
+    maxCompletionTokens: 180
+  stt:
+    endpoint: https://api.openai.com/v1/audio/transcriptions
+    model: gpt-4o-mini-transcribe
+    responseFormat: json
+    language: es
+    requestTimeoutSeconds: 90
+    logRequestDetails: 0
+  streamingOpenAiTts:
+    endpoint: https://api.openai.com/v1/audio/speech
+    model: gpt-4o-mini-tts
+    voice: onyx
+    instructions: "Speak in European Spanish, Castilian Spanish, with a natural
+      pronunciation from Castile and Leon. Keep a fast, fluid rhythm with short
+      pauses. Avoid a Latin American accent, avoid voseo, and avoid Latin American
+      seseo. Use a cultured tone, appropriate for a Spanish historical figure. Keep
+      responses short: 1-2 short sentences."
+    speed: 1.25
+    sampleRate: 24000
+    channels: 1
+    maxClipSeconds: 60
+    requestTimeoutSeconds: 90
+    firstChunkTimeoutSeconds: 6
+    chunkSilenceTimeoutSeconds: 10
+    prebufferSeconds: 0.6
+    drainGraceSeconds: 4
+    logChunks: 0
+    largeChunkGapWarningSeconds: 0.25
+    captureFullPcmForDebug: 0
+    logExpectedDuration: 0
+    buildDebugClipOnComplete: 0
+  streamingElevenLabsTts:
+    voiceId: orF2qy9215xjwqqxqsWW
+    modelId: eleven_turbo_v2.5
+    languageCode: 
+    verboseLogging: 1
+    optimizeStreamingLatency: -1
+    speed: 1
+    stability: 0.5
+    similarityBoost: 0.8
+    style: 0
+    useSpeakerBoost: 1
+    outputFormat: 7
+    requestTimeoutSeconds: 90
+    firstChunkTimeoutSeconds: 4
+    chunkSilenceTimeoutSeconds: 2.5
+    prebufferSeconds: 0.35
+    drainGraceSeconds: 2
+    captureFullPcmForDebug: 1
+    logExpectedDuration: 1
+    buildDebugClipOnComplete: 0
+    largeChunkGapWarningSeconds: 0.25
+    maxClipSeconds: 60
+  realtimeOpenAiTts:
+    maxChunkChars: 30
+    interChunkGapSeconds: 0
+    verboseLogging: 0
+    enableTelemetry: 0
+    enqueueStallTimeoutSeconds: 15
+    chunkCrossfadeMs: 60
+  realtimeAudioPlayer:
+    bufferCapacitySamples: 705600
+    prebufferSamples: 4096
+    startSafetySamples: 4096
+    adaptiveStartMaxWaitMs: 80
+    drainGraceSamples: 1024
+  conversationController:
+    useKeyboardDebugShortcut: 1
+    keyboardDebugKey: 32
+    useXriPushToTalk: 1
+    minimumHoldSeconds: 0.12
+    allowBargeInWhileSpeaking: 1
+    includeAssistantTextInMetrics: 1
+    includeSourcesInBackendInfo: 1
+  worldSpaceDebugPanel:
+    captureUnityLogs: 1
+    maxLogLines: 8
+    includeControllerHeartbeat: 1
+  newUserSessionInput:
+    useRightSecondaryButtonFallback: 1

@@ -5,11 +5,18 @@ using System.Collections.Generic;
 
 public class NewUserSessionInputHandler : MonoBehaviour
 {
+    private static ConversationSettings Settings => ConversationSettings.Instance;
+
     [SerializeField] private OpenAIConversationController conversationController;
     [SerializeField] private InputActionProperty newUserAction;
     [SerializeField] private InputActionProperty toggleMenusAction;
     [SerializeField] private List<GameObject> menuRoots = new List<GameObject>();
-    [SerializeField] private bool useRightSecondaryButtonFallback = true;
+
+    private bool useRightSecondaryButtonFallback
+    {
+        get => Settings.NewUserSessionInput.useRightSecondaryButtonFallback;
+        set => Settings.NewUserSessionInput.useRightSecondaryButtonFallback = value;
+    }
 
     private bool previousRightSecondaryPressed;
 

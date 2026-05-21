@@ -10,43 +10,59 @@ namespace MVP.Conversation
 {
     public class OpenAISTTClient : MonoBehaviour, ISTTService
     {
-        [Header("OpenAI STT")]
-        [SerializeField]
-        [Tooltip("Tu API key de OpenAI. Mantener privado.")]
-        private string apiKey = "YOUR_OPENAI_API_KEY";
-        
-        [SerializeField]
-        [Tooltip("Endpoint de OpenAI para transcripción. No cambiar a menos que uses proxy.")]
-        private string endpoint = "https://api.openai.com/v1/audio/transcriptions";
-        
-        [SerializeField]
-        [Tooltip("Modelo STT a usar. 'gpt-4o-mini-transcribe' es rápido y preciso.")]
-        private string model = "gpt-4o-mini-transcribe";
-        
-        [SerializeField]
-        [Tooltip("Formato respuesta. 'json' = solo texto. 'verbose_json' = con timestamps.")]
-        private string responseFormat = "json";
-        
-        [SerializeField]
-        [Tooltip("Idioma de entrada (es=español, en=inglés). Mejora precisión.")]
-        private string language = "es";
-        
-        [Header("Request Guards")]
-        [SerializeField]
-        [Range(5, 180)]
-        [Tooltip("Timeout STT (s). Audio largo tarda más. Aumentar si hay timeout en grabaciones largas.")]
-        private int requestTimeoutSeconds = 90;
+        private const string ApiKeyEnvironmentVariable = "OPENAI_API_KEY";
+        private string apiKey = string.Empty;
 
-        [Header("Debug")]
-        [SerializeField]
-        [Tooltip("Mostrar logs detallados de la petición STT. Dejar apagado para pruebas normales.")]
-        private bool logRequestDetails = false;
+        private static ConversationSettings Settings => ConversationSettings.Instance;
+
+        private string endpoint
+        {
+            get => Settings.Stt.endpoint;
+            set => Settings.Stt.endpoint = value;
+        }
+
+        private string model
+        {
+            get => Settings.Stt.model;
+            set => Settings.Stt.model = value;
+        }
+
+        private string responseFormat
+        {
+            get => Settings.Stt.responseFormat;
+            set => Settings.Stt.responseFormat = value;
+        }
+
+        private string language
+        {
+            get => Settings.Stt.language;
+            set => Settings.Stt.language = value;
+        }
+
+        private int requestTimeoutSeconds
+        {
+            get => Settings.Stt.requestTimeoutSeconds;
+            set => Settings.Stt.requestTimeoutSeconds = value;
+        }
+
+        private bool logRequestDetails
+        {
+            get => Settings.Stt.logRequestDetails;
+            set => Settings.Stt.logRequestDetails = value;
+        }
 
         public IEnumerator Transcribe(byte[] audioBytes, Action<string, string> onComplete)
         {
+            string resolvedApiKey = GetApiKey();
+            if (string.IsNullOrWhiteSpace(resolvedApiKey))
+            {
+                onComplete?.Invoke(null, $"OpenAISTTClient: API key not configured. Set {ApiKeyEnvironmentVariable}.");
+                yield break;
+            }
+
             if (audioBytes == null || audioBytes.Length == 0)
             {
-                onComplete?.Invoke(null, "No hay audio para transcribir.");
+                onComplete?.Invoke(null, "There is no audio to transcribe.");
                 yield break;
             }
 
@@ -67,7 +83,7 @@ namespace MVP.Conversation
             request.disposeUploadHandlerOnDispose = true;
             request.disposeDownloadHandlerOnDispose = true;
 
-            request.SetRequestHeader("Authorization", $"Bearer {apiKey}");
+            request.SetRequestHeader("Authorization", $"Bearer {resolvedApiKey}");
             request.SetRequestHeader("Content-Type", $"multipart/form-data; boundary={boundary}");
             request.SetRequestHeader("Accept", "application/json");
 
@@ -108,7 +124,7 @@ namespace MVP.Conversation
 
             if (rawBytes == null || rawBytes.Length == 0 || string.IsNullOrWhiteSpace(raw))
             {
-                onComplete?.Invoke(null, $"STT response body vacío. code={request.responseCode}, rawBytes={(rawBytes == null ? -1 : rawBytes.Length)}");
+                onComplete?.Invoke(null, $"Empty STT response body. code={request.responseCode}, rawBytes={(rawBytes == null ? -1 : rawBytes.Length)}");
                 yield break;
             }
 
@@ -131,7 +147,7 @@ namespace MVP.Conversation
 
                 if (string.IsNullOrWhiteSpace(parsedText))
                 {
-                    onComplete?.Invoke(null, $"JSON recibido pero sin campo text útil. RAW:\n{raw}");
+                    onComplete?.Invoke(null, $"JSON received but without a useful text field. RAW:\n{raw}");
                     yield break;
                 }
 
@@ -139,8 +155,13 @@ namespace MVP.Conversation
             }
             catch (Exception e)
             {
-                onComplete?.Invoke(null, "Error parseando respuesta STT: " + e.Message + "\nRAW:\n" + raw);
+                onComplete?.Invoke(null, "Error parsing STT response: " + e.Message + "\nRAW:\n" + raw);
             }
+        }
+
+        private string GetApiKey()
+        {
+            return ApiKeyProvider.Resolve(apiKey, ApiKeyEnvironmentVariable, nameof(OpenAISTTClient));
         }
 
         private static byte[] BuildMultipartBody(string boundary, byte[] audioBytes, string model, string responseFormat, string language)
