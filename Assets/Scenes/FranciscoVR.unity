@@ -2105,6 +2105,75 @@ MonoBehaviour:
   m_ChildScaleWidth: 0
   m_ChildScaleHeight: 0
   m_ReverseArrangement: 0
+--- !u!1 &867519025
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 867519027}
+  - component: {fileID: 867519026}
+  m_Layer: 0
+  m_Name: StreamingTTSElevenLab
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!114 &867519026
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 867519025}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 6b37db9046967a941823a54b87125ddf, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::MVP.Conversation.StreamingElevenLabsTTSClient
+  apiKey: sk_305e29e7824427d7eb27af422965a0cf03d25354acedad3a
+  voiceId: orF2qy9215xjwqqxqsWW
+  modelId: eleven_turbo_v2.5
+  languageCode: 
+  verboseLogging: 1
+  optimizeStreamingLatency: -1
+  speed: 1
+  stability: 0.5
+  similarityBoost: 0.8
+  style: 0
+  useSpeakerBoost: 1
+  outputFormat: 7
+  requestTimeoutSeconds: 90
+  firstChunkTimeoutSeconds: 4
+  chunkSilenceTimeoutSeconds: 2.5
+  prebufferSeconds: 0.35
+  drainGraceSeconds: 2
+  captureFullPcmForDebug: 1
+  logExpectedDuration: 1
+  buildDebugClipOnComplete: 0
+  largeChunkGapWarningSeconds: 0.25
+  maxClipSeconds: 60
+  previousText: 
+  nextText: 
+  seed: -1
+--- !u!4 &867519027
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 867519025}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 6509928022762900343}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1001 &868400268
 PrefabInstance:
   m_ObjectHideFlags: 0
@@ -9017,7 +9086,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 72d65e3b638233c4a887d8169d9ef31c, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::MVP.Conversation.RealtimeOpenAITTSClient
-  innerTtsServiceBehaviour: {fileID: 4390697800605530062}
+  innerTtsServiceBehaviour: {fileID: 867519026}
   realtimeAudioPlayer: {fileID: 9206487418811563760}
   lipSyncBridge: {fileID: 1104509729}
   streamingAudioSource: {fileID: 4032331762414432206}
@@ -11631,7 +11700,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 1
+  m_IsActive: 0
 --- !u!1 &910061505093433286
 GameObject:
   m_ObjectHideFlags: 0
@@ -17114,7 +17183,7 @@ MonoBehaviour:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 894496406878085584}
-  m_Enabled: 1
+  m_Enabled: 0
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: c2e88891ee7c9bb499cdc9030df01f09, type: 3}
   m_Name: 
@@ -23300,6 +23369,7 @@ Transform:
   m_ConstrainProportionsScale: 0
   m_Children:
   - {fileID: 8808433031116657696}
+  - {fileID: 867519027}
   - {fileID: 1495054823}
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
