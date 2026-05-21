@@ -1,0 +1,4 @@
+Assets/Oculus/LipSync/Plugins/MacOSX/OVRLipSync.bundle filter=lfs diff=lfs merge=lfs -text
+Assets/Oculus/LipSync/Plugins/iOS/libOVRLipSync.dylib filter=lfs diff=lfs merge=lfs -text
+Assets/Modelos/T_Cueo_Libro_Color.png filter=lfs diff=lfs merge=lfs -text
+Assets/Modelos/T_Cuero_Libro_Normal.png filter=lfs diff=lfs merge=lfs -text
