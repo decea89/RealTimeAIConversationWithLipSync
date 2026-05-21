@@ -1,6 +1,6 @@
 # VR Conversational Avatar
 
-Unity project for a VR conversational avatar with STT, chat, TTS, lip sync, latency telemetry, and a world-space debug panel. The goal is to keep it portfolio-ready: clear architecture, observable flow, and credentials out of the code.
+Unity project for a VR conversational avatar with STT, chat, TTS, lip sync, latency telemetry, and a world-space debug panel. The goal is to keep clear architecture, observable flow, and credentials out of the code.
 
 ## What It Does
 
@@ -38,15 +38,10 @@ There are no real keys in the repository. Clients read local environment variabl
 
 This avoids exposing credentials in the project and keeps the repo clean for portfolio use.
 
-## Main Scenes
-
-- `Assets/Scenes/FranciscoVR.unity`: main project scene.
-- `Assets/Scenes/SampleScene.unity`: support or test scene.
-
 ## Usage Flow
 
 1. Configure the environment variables or fill the local private API key fields.
-2. Open `FranciscoVR.unity`.
+2. Open `ConversationalAIAvatar.unity`.
 3. Adjust `Assets/Resources/ConversationSettings.asset` if you want to change conversation behavior.
 4. Assign the active controller services in the inspector.
 5. Use push-to-talk and check the world-space debug panel for state, timings, and errors.
@@ -55,8 +50,7 @@ This avoids exposing credentials in the project and keeps the repo clean for por
 
 - Communication between layers uses interfaces, not direct dependencies on concrete implementations.
 - Telemetry and streaming logs help diagnose latency, gaps, and HTTP failures.
-- Several old prototypes and duplicates were removed to leave only the current execution path.
 
 ## Current State
 
-The main path is ready for testing in the Editor and on Quest, with an emphasis on audio stability, observability, and credentials outside the code.
+The main path is ready for testing in the Editor and on Quest, with an emphasis on audio stability, and observability.
