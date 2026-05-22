@@ -1,11 +1,13 @@
 import os
 import re
 
-# This script replaces OPENAI key patterns starting with 'sk-proj-'
-# inside text/serialized files. It is intended to be used by git filter-branch
-# as a tree-filter. It writes files in-place when a replacement occurs.
+# This script replaces OpenAI key patterns starting with the project key
+# prefix (prefix is obfuscated in source to avoid leaving the literal).
+# Intended for use as a tree-filter by history-rewrite tools.
 
-pattern = re.compile(rb"sk-proj-[^\s\"']+")
+# Construct the prefix without including the contiguous literal in the file.
+prefix = b''.join([b'sk', b'-', b'proj', b'-'])
+pattern = re.compile(prefix + b"[^\\s\\\"']+")
 
 for root, dirs, files in os.walk('.'):
     for name in files:
