@@ -1,5 +1,7 @@
 # VR Conversational Avatar
 
+<img width="1292" height="904" alt="image" src="https://github.com/user-attachments/assets/20e1c31d-5b92-4512-ad33-f2bf4b987547" />
+
 Unity project for a VR conversational avatar with STT, chat, TTS, lip sync, latency telemetry, and a world-space debug panel. The goal is to keep clear architecture, observable flow, and credentials out of the code.
 
 ## What It Does
